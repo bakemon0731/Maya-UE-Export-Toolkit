@@ -1,13 +1,36 @@
 import maya.cmds as cmds
 
 
-def get_selected_objects():
+def validate_selected_meshes():
     selected = cmds.ls(selection=True, long=True) or []
-    return selected
+
+    if not selected:
+        print("オブジェクトを選択してください")
+        return
+
+    for obj in selected:
+        shapes = cmds.listRelatives(
+            obj,
+            shapes=True,
+            noIntermediate=True,
+            fullPath=True
+        ) or []
+
+        if not shapes:
+            print("Shapeが見つかりません:", obj)
+            continue
+
+        for shape in shapes:
+            shape_type = cmds.nodeType(shape)
+
+            print("オブジェクト:", obj)
+            print("Shape:", shape)
+            print("ノードの種類:", shape_type)
+
+            if shape_type == "mesh":
+                print("ポリゴンメッシュです")
+            else:
+                print("ポリゴンメッシュではありません")
 
 
-objects = get_selected_objects()
-
-print("取得したデータ:", objects)
-print("データ型:", type(objects))
-print("取得した個数:", len(objects))
+validate_selected_meshes()
