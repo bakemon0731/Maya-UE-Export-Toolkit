@@ -1,4 +1,9 @@
 import maya.cmds as cmds
+import re
+
+def validate_name(name):
+    pattern = r"^SM_[A-Za-z0-9]+$"
+    return bool(re.match(pattern,name))
 
 
 def validate_selected_meshes():
@@ -9,28 +14,13 @@ def validate_selected_meshes():
         return
 
     for obj in selected:
-        shapes = cmds.listRelatives(
-            obj,
-            shapes=True,
-            noIntermediate=True,
-            fullPath=True
-        ) or []
+        name = obj.split("|")[-1]
 
-        if not shapes:
-            print("Shapeが見つかりません:", obj)
-            continue
+        if validate_name(name):
+            print(name,"-> 命名規則OK")
+        else:
+            print(name, "-> 命名規則NG")
 
-        for shape in shapes:
-            shape_type = cmds.nodeType(shape)
-
-            print("オブジェクト:", obj)
-            print("Shape:", shape)
-            print("ノードの種類:", shape_type)
-
-            if shape_type == "mesh":
-                print("ポリゴンメッシュです")
-            else:
-                print("ポリゴンメッシュではありません")
 
 
 validate_selected_meshes()
