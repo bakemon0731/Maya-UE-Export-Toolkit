@@ -87,3 +87,40 @@ Mayaで選択したオブジェクトの名前が、Unreal Engine向けの命名
 
 ## 次の課題
 -オブジェクトのTransform（位置・回転・スケール）が、Unreal Engineへの出力に適した状態か検証する。
+
+
+
+
+
+# 学習記録 04：Transformの検証
+
+## 目的
+Mayaで選択したオブジェクトのTransformを取得し、基準値から外れている属性を検出する
+
+## 学習した内容
+-cmds.getAttr() による属性値の取得
+-Translate・Rotate・Scaleの基本的な違い
+-Freeze Transformationsによる値の変化
+-TOLERANCE による許容誤差の設定
+-abs() による差の絶対値の計算
+-any() による複数の値の条件判定
+-problems.append() による問題属性の記録
+-関数による検証処理の分離
+
+# 今回の検証ルール
+-Translateの基準値：(0, 0, 0)
+-Rotateの基準値：(0, 0, 0)
+-Scaleの基準値：(1, 1, 1)
+-許容誤差：0.001
+
+# テスト結果
+-基準値どおりのTransform：Transform OK
+-Translate Xを3に変更：Translateを検出
+-Rotate Yを30に変更：Rotateを検出
+-Scale Yを2に変更：Scaleを検出
+
+## 今回の学び
+-PythonでMayaの属性値を取得し、基準値と比較することで、確認が必要な属性を検出できる。
+
+## 次の課題
+検証機能を整理し、Unreal Engineへの出力前チェックツールとして段階的に拡張する。
