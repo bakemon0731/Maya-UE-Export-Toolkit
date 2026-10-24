@@ -51,4 +51,5 @@ def validate_selected_ngons():
         validate_ngons(obj)
 
 
-validate_selected_ngons()
+if __name__ == "__main__":
+    validate_selected_ngons()

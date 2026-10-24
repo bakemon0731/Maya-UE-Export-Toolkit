@@ -50,4 +50,5 @@ def validate_selected_uvs():
         validate_uvs(obj)
 
 
-validate_selected_uvs()
+if __name__ == "__main__":
+    validate_selected_uvs()

@@ -26,4 +26,5 @@ def validate_selected_history():
 
 
 
-validate_selected_history()
+if __name__ == "__main__":
+    validate_selected_history()

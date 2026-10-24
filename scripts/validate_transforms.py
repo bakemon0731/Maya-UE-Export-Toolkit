@@ -44,4 +44,5 @@ def validate_selected_transforms():
 
 
 
-validate_selected_transforms()
+if __name__ == "__main__":
+    validate_selected_transforms()
