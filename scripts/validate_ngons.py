@@ -1,3 +1,5 @@
+from unittest import result
+
 import maya.cmds as cmds
 
 def validate_ngons(obj):
@@ -6,13 +8,24 @@ def validate_ngons(obj):
 
     shapes = cmds.listRelatives(obj,shapes=True,noIntermediate=True,fullPath=True,type="mesh") or []
 
+    # Meshがない場合
     if not shapes:
+        result = {
+            "object": name,
+            "check": "N-gon",
+            "status": "NG",
+            "message": "Meshが見つかりません",
+            "details": []
+        }
+
         print(name,"-> Meshが見つかりません")
         return
 
+    # 検出したN-gonの情報を保存する
+    ngon_faces = []
+
     for shape in shapes:
         face_count = cmds.polyEvaluate(shape, face=True)
-        ngon_faces = []
 
         for face_index in range(face_count):
             face = shape + ".f[" + str(face_index) + "]"
@@ -27,17 +40,40 @@ def validate_ngons(obj):
             vertex_indices = vertex_text.split()
             vertex_count = len(vertex_indices)
 
-            #面を構成する頂点の数を数え、5以上ならN-gon候補として表示する仕組み
+            #面を構成する頂点の数を数え、5以上ならN-gon候補として記録する仕組み
             if vertex_count > 4:
-                ngon_faces.append((face_index, vertex_count))
+               ngon_faces.append({
+                   "shape": shape,
+                   "face_index": face_index,
+                   "vertex_count": vertex_count
+               })
 
+        # 検証結果を決定する
         if ngon_faces:
+            status = "NG"
+            message = "N-gonが見つかりました"
             print(name,"-> N-gonあり")
 
-            for face_index,vertex_count in ngon_faces:
-                print(" 面番号:", face_index,"頂点数:",vertex_count)
+            for face_data in ngon_faces:
+                print(" 面番号:", face_data["face_index"],
+                      "頂点数:", face_data["vertex_count"]
+                )
         else:
+            status = "OK"
+            message = "N-gonはありません"
             print(name,"-> N-gonなし")
+
+
+        #検証結果を辞書として返す
+        result = {
+            "object": name,
+            "check": "N-gon",
+            "status": status,
+            "message": message,
+            "details": ngon_faces
+        }
+
+        return result
 
 
 def validate_selected_ngons():
@@ -45,11 +81,17 @@ def validate_selected_ngons():
 
     if not selected:
         print("オブジェクトを選択してください")
-        return
+        return []
+
+    results = []
 
     for obj in selected:
-        validate_ngons(obj)
+        result = validate_ngons(obj)
+        results.append(result)
+
+    return results
 
 
 if __name__ == "__main__":
-    validate_selected_ngons()
+    results = validate_selected_ngons()
+    print("検証データ:", results)

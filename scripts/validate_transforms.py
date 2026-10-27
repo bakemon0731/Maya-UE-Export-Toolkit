@@ -1,3 +1,6 @@
+from email import message
+from unittest import result
+
 import maya.cmds as cmds
 
 #浮動小数点数の誤差を考慮するための許容値
@@ -25,11 +28,26 @@ def validate_transform(obj):
     if any(abs(value - 1.0) > TOLERANCE for value in scale):
         problems.append("Scale")
 
-
+    #　検証結果を決定する
     if problems:
+        status = "NG"
+        message = "基準値から外れています:"+",".join(problems)
         print(name, "-> Transform要確認:",",".join(problems))
     else:
+        status = "OK"
+        message = "Transformは基準値です"
         print(name,"-> Transform OK")
+
+    #　検証結果を辞書として返す
+    result = {
+        "object": name,
+        "check": "Transform",
+        "status": status,
+        "message": message,
+        "details":problems
+        }
+
+    return result
 
 
 def validate_selected_transforms():
@@ -37,12 +55,17 @@ def validate_selected_transforms():
 
     if not selected:
         print("オブジェクトを選択してください")
-        return
+        return []
+
+    results = []
 
     for obj in selected:
-        validate_transform(obj)
+        result = validate_transform(obj)
+        results.append(result)
 
+    return results
 
 
 if __name__ == "__main__":
-    validate_selected_transforms()
+    results = validate_selected_transforms()
+    print("検証データ:", results)
