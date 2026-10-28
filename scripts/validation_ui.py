@@ -534,7 +534,114 @@ def validate_and_export(*args):
             "status": "ERROR",
             "message": str(error)
         }
-            
+
+def fix_transforms_and_revalidate(*args):
+    """Transformを自動修正し、5種類の検証を再実行する。"""
+
+    # 選択中のオブジェクトを取得する
+    selected = cmds.ls(
+        selection=True,
+        long=True,
+        type="transform"
+    ) or []
+
+    # オブジェクトが選択されていなければ終了
+    if not selected:
+        message = (
+            "オブジェクトが選択されていません。"
+            "Transform自動修正を中止しました。"
+        )
+
+        print(message)
+
+        cmds.scrollField(
+            OUTPUT_FIELD,
+            edit=True,
+            text=message
+        )
+
+        error_result = {
+            "object": None,
+            "check": "選択状態",
+            "status": "ERROR",
+            "message": message
+        }
+
+        return {
+            "fix_results": [error_result],
+            "validation_results": [],
+            "failed_results": [error_result]
+        }
+
+    import importlib
+    import fix_transforms
+
+    # 自動修正モジュールを読み込み直す
+    importlib.reload(fix_transforms)
+
+    # Transformを自動修正する
+    fix_results = fix_transforms.fix_selected_transforms()
+
+    # 修正結果を表示する
+    output_lines = ["=== Transform自動修正の結果 ==="]
+
+    for result in fix_results:
+        output_lines.append(
+            "対象: {} | 状態: {} | 内容: {}".format(
+                result.get("object"),
+                result.get("status"),
+                result.get("message")
+            )
+        )
+
+    # 修正後に5種類の検証を実行する
+    validation_results = run_all_checks()
+
+    # 検証結果を集計する
+    failed_results = [
+        result
+        for result in validation_results
+        if result.get("status") != "OK"
+    ]
+
+    # 検証結果の要約を作成する
+    output_lines.append("")
+    output_lines.append("=== 修正後の再検証結果 ===")
+    output_lines.append(
+        "検証件数: {}".format(len(validation_results))
+    )
+    output_lines.append(
+        "要確認件数: {}".format(len(failed_results))
+    )
+
+    # 結果の詳細を追加する
+    for result in validation_results:
+        output_lines.append(
+            "対象: {} | 検証: {} | 状態: {} | 内容: {}".format(
+                result.get("object"),
+                result.get("check"),
+                result.get("status"),
+                result.get("message")
+            )
+        )
+
+    output_text = "\n".join(output_lines)
+
+    print(output_text)
+
+    cmds.scrollField(
+        OUTPUT_FIELD,
+        edit=True,
+        text=output_text
+    )
+
+    # 呼び出し元でも結果を利用できるようにする
+    return {
+        "fix_results": fix_results,
+        "validation_results": validation_results,
+        "failed_results": failed_results
+    }
+          
 
 def show_ui():
     """検証ツールのウィンドウを表示する。"""
@@ -606,6 +713,12 @@ def show_ui():
         label = "全項目チェック",
         height=40,
         command=run_all_checks
+    )
+
+    cmds.button(
+        label = "Transform自動修正して再検証",
+        height=40,
+        command=fix_transforms_and_revalidate
     )
 
     cmds.button(
