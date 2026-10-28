@@ -407,6 +407,135 @@ def run_all_checks(*args):
         text=output_text
     )
 
+    return all_results
+
+def validate_and_export(*args):
+    """検証を実行し、すべてOKの場合だけFBXを書き出す。"""
+
+    # 5種類の検証を実行
+    results = run_all_checks()
+
+    # 検証結果がない場合は中止
+    if not results:
+        message = "検証結果がありません。選択状態を確認してください。"
+        print(message)
+
+        cmds.scrollField(
+            OUTPUT_FIELD,
+            edit=True,
+            text=message
+        )
+
+        return {
+            "status": "ERROR",
+            "message": message
+        }
+
+    # OK以外の結果を抽出
+    failed_results = [
+        result
+        for result in results
+        if result.get("status") != "OK"
+    ]
+
+    # NGやERRORがあれば書き出さない
+    if failed_results:
+        output_lines = [
+            "検証NGがあるため、FBX書き出しを中止します"
+        ]
+
+        for result in failed_results:
+            output_lines.append(
+                "対象: {} | 検証: {} | 状態: {} | 内容: {}".format(
+                    result.get("object"),
+                    result.get("check"),
+                    result.get("status"),
+                    result.get("message")
+                )
+            )
+
+        output_text = "\n".join(output_lines)
+
+        print(output_text)
+
+        cmds.scrollField(
+            OUTPUT_FIELD,
+            edit=True,
+            text=output_text
+        )
+
+        return{
+            "status": "NG",
+            "message": "検証NGがあるため、書き出しを中止しました",
+            "failed_results": failed_results
+        }
+
+    #すべてOKの場合だけFBX書き出しを実行
+    try:
+        import importlib
+        import export_fbx
+
+        importlib.reload(export_fbx)
+
+        export_result = export_fbx.export_selected_fbx()
+
+        # 書き出し結果をUIに表示
+        status = export_result.get("status")
+
+        if status == "OK":
+            output_lines = [
+                "すべての検証に合格しました",
+                "FBX書き出しが完了しました",
+                "保存先: {}".format(
+                    export_result.get("file_path")
+                )
+            ]
+
+        elif status == "CANCELLED":
+            output_lines = [
+                "検証はすべてOKです",
+                "FBX書き出しはキャンセルされました"
+            ]
+
+        else:
+            output_lines = [
+                "検証はすべてOKです",
+                "FBX書き出しに失敗しました",
+                "エラー: {}".format(
+                    export_result.get("message","詳細不明")
+                )
+            ]
+
+        output_text = "\n".join(output_lines)
+
+        print(output_text)
+
+        cmds.scrollField(
+            OUTPUT_FIELD,
+            edit=True,
+            text=output_text
+        )
+
+        return export_result
+
+    #書き出し中のtryが失敗した場合実行
+    except Exception as error:
+        message = "統合処理でエラーが発生しました: {}".format(error)
+
+        print(message)
+
+        cmds.scrollField(
+            OUTPUT_FIELD,
+            edit=True,
+            text=message
+        )
+
+        return {
+            "status": "ERROR",
+            "message": str(error)
+        }
+            
+
 def show_ui():
     """検証ツールのウィンドウを表示する。"""
 
@@ -477,6 +606,12 @@ def show_ui():
         label = "全項目チェック",
         height=40,
         command=run_all_checks
+    )
+
+    cmds.button(
+        label = "検証してFBX書き出し",
+        height=40,
+        command= validate_and_export
     )
 
     # ウィンドウを表示する
