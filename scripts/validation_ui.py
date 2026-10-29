@@ -593,9 +593,103 @@ def fix_transforms_and_revalidate(*args):
                 result.get("message")
             )
         )
+    
+        # 自動修正に失敗した結果を抽出する
+    fix_errors = [
+        result
+        for result in fix_results
+        if result.get("status") == "ERROR"
+    ]
 
-    # 修正後に5種類の検証を実行する
-    validation_results = run_all_checks()
+    # ERRORがあれば、再検証を実行せずに終了する
+    if fix_errors:
+        output_lines.append("")
+        output_lines.append(
+            "自動修正に失敗したため、再検証を中止しました。"
+        )
+
+        for result in fix_errors:
+            output_lines.append(
+                "対象: {} | エラー: {}".format(
+                    result.get("object"),
+                    result.get("message")
+                )
+            )
+
+        output_text = "\n".join(output_lines)
+
+        print(output_text)
+
+        cmds.scrollField(
+            OUTPUT_FIELD,
+            edit=True,
+            text=output_text
+        )
+
+        return {
+            "fix_results": fix_results,
+            "validation_results": [],
+            "failed_results": fix_errors
+        }
+
+    # 自動修正に成功した結果を抽出する
+    fix_successes = [
+        result
+        for result in fix_results
+        if result.get("status") == "OK"
+    ]
+
+    # 修正対象外としてスキップされた結果を抽出する
+    fix_skips = [
+        result
+        for result in fix_results
+        if result.get("status") == "SKIP"
+    ]
+
+    # 修正に成功したメッシュが1つもない場合
+    if not fix_successes:
+        output_lines.append("")
+        output_lines.append(
+            "自動修正できるメッシュがないため、再検証を中止しました。"
+        )
+
+        output_text = "\n".join(output_lines)
+
+        print(output_text)
+
+        cmds.scrollField(
+            OUTPUT_FIELD,
+            edit=True,
+            text=output_text
+        )
+
+        return {
+            "fix_results": fix_results,
+            "validation_results": [],
+            "failed_results": []
+        }
+
+    # 自動修正に成功したオブジェクトだけを再検証する
+    successful_objects = [
+        result.get("object")
+        for result in fix_successes
+        if result.get("object")
+    ]
+
+    # 再検証の前に、対象をメッシュだけに絞る
+    cmds.select(successful_objects, replace=True)
+
+    try:
+        validation_results = run_all_checks()
+
+    finally:
+        # 処理後に、元の選択状態へ戻す
+        if selected:
+            cmds.select(selected, replace=True)
+
+        else:
+            cmds.select(clear=True)
+
 
     # 検証結果を集計する
     failed_results = [
