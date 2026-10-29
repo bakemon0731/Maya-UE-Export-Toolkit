@@ -767,6 +767,59 @@ def fix_history_and_revalidate(*args):
             }]
         }
 
+    # 選択対象の名前を取り出す
+    selected_names = [
+        obj.split("|")[-1]
+        for obj in selected
+    ]
+
+    # 複数の選択オブジェクトを一覧確認
+    object_list = "\n".join(
+         "- " + name
+         for name in selected_names
+    )
+
+    message = (
+        "次の選択対象を処理します。\n\n"
+        + object_list
+        + "\n\n対応するメッシュのConstruction Historyを削除します。\n"
+        "メッシュ以外や対応対象外の履歴は、処理を見送ります。\n\n"
+        "削除後は、モデリング操作の履歴を編集できなくなります。\n"
+        "続行しますか？"
+    )
+
+    # Construction History削除の確認ダイアログ
+    answer = cmds.confirmDialog(
+        title="Construction Historyの削除確認",
+        message=message,
+        button=["実行する","キャンセル"],
+        defaultButton="キャンセル",
+        cancelButton="キャンセル",
+        dismissString="キャンセル",
+        icon="warning"
+    )
+
+    # キャンセルされた場合は処理を終了
+    if answer != "実行する":
+        message = "Construction HIstoryの削除をキャンセルしました。"
+
+        print(message)
+
+        cmds.scrollField(
+            OUTPUT_FIELD,
+            edit=True,
+            text=message
+        )
+
+        return {
+            "status": "CANCELLED",
+            "message": message,
+            "fix_results": [],
+            "validation_results": [],
+            "failed_results": [],
+            "skipped_results": []
+        }
+
     import importlib
     import fix_history
 
