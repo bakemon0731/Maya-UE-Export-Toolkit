@@ -573,6 +573,56 @@ def fix_transforms_and_revalidate(*args):
             "failed_results": [error_result]
         }
 
+    # Transform自動修正の確認ダイアログ
+    selected_names = [
+        obj.split("|")[-1]
+        for obj in selected
+    ]
+
+    object_list = "\n".join(
+        "- " + name
+        for name in selected_names
+    )
+
+    message = (
+        "次の選択対象のTransformを修正します。\n\n"
+        + object_list
+        + "\n\n"
+        "Translate・Rotate・Scaleを基準値に戻します。\n"
+        "処理を続行しますか？"
+    )
+
+    answer = cmds.confirmDialog(
+        title="Transform自動修正の確認",
+        message=message,
+        button=["実行する", "キャンセル"],
+        defaultButton="キャンセル",
+        cancelButton="キャンセル",
+        dismissString="キャンセル",
+        icon="warning"
+    )
+
+    # キャンセル時は修正処理へ進まない
+    if answer != "実行する":
+        message = "Transform自動修正をキャンセルしました。"
+
+        print(message)
+
+        cmds.scrollField(
+            OUTPUT_FIELD,
+            edit=True,
+            text=message
+        )
+
+        return {
+            "status": "CANCELLED",
+            "message": message,
+            "fix_results": [],
+            "validation_results": [],
+            "failed_results": [],
+            "skipped_results": []
+        }
+
     import importlib
     import fix_transforms
 
