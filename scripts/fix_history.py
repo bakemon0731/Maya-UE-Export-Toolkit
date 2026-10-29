@@ -1,5 +1,11 @@
 import maya.cmds as cmds
 
+# 自動削除を許可する履歴ノードの種類
+ALLOWED_HISTORY_TYPES = {
+    "polyCube",
+    "polyExtrudeFace",
+}
+
 
 def fix_selected_history():
     """選択されたメッシュのポリゴンモデリング履歴を削除する。"""
@@ -66,11 +72,11 @@ def fix_selected_history():
                 for node in history
             }
 
-            # poly系以外の履歴があれば、自動削除しない
+            # 許可リストにない履歴があれば、自動削除しない
             unsupported_nodes = [
                 node
                 for node, node_type in history_types.items()
-                if not node_type.startswith("poly")
+                if node_type not in ALLOWED_HISTORY_TYPES
             ]
 
             if unsupported_nodes:

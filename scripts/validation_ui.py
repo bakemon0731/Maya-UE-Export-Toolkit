@@ -786,6 +786,17 @@ def fix_history_and_revalidate(*args):
             )
         )
 
+        # 詳細情報がある場合は、ノード名と種類も表示する
+        details = result.get("details",[])
+
+        for detail in details:
+            output_lines.append(
+                "  対象ノード: {} | 種類: {}".format(
+                    detail.get("node"),
+                    detail.get("type")
+                )
+            )
+
     #  修正に失敗した結果を抽出
     fix_errors = [
         result
