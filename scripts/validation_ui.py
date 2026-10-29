@@ -584,11 +584,59 @@ def fix_transforms_and_revalidate(*args):
         for name in selected_names
     )
 
+    # 修正対象とスキップ対象を分類する
+    fix_candidates = []
+    skipped_objects = []
+
+    for obj in selected:
+        shapes = cmds.listRelatives(
+            obj,
+            shapes=True,
+             noIntermediate=True,
+            fullPath=True
+        ) or []
+
+        mesh_shapes = [
+            shape
+            for shape in shapes
+            if cmds.nodeType(shape) == "mesh"
+        ]
+
+        object_name = obj.split("|")[-1]
+
+        #メッシュShapeがあるかどうか
+        if mesh_shapes:
+            fix_candidates.append(object_name)
+        else:
+            skipped_objects.append(object_name)
+
+    # 修正対象の一覧
+    if fix_candidates:
+        fix_list = "\n".join(
+            "- " + name
+            for name in fix_candidates
+        )
+    else:
+        fix_list = "なし"
+
+    # スキップ対象の一覧
+    if skipped_objects:
+        skipped_list = "\n".join(
+            "- " + name
+            for name in skipped_objects
+        )
+    else:
+        skipped_objects = "なし"
+
+
+   # 確認ダイアログに表示する文章
     message = (
-        "次の選択対象のTransformを修正します。\n\n"
-        + object_list
-        + "\n\n"
-        "Translate・Rotate・Scaleを基準値に戻します。\n"
+        "Transform自動修正の対象を確認してください。\n\n"
+        "【修正対象（メッシュ）】\n"
+        + fix_list
+        + "\n\n【スキップ対象（メッシュShapeなし）】\n"
+        + skipped_list
+        + "\n\nTranslate・Rotate・Scaleを基準値に戻します。\n"
         "処理を続行しますか？"
     )
 
@@ -789,6 +837,11 @@ def fix_transforms_and_revalidate(*args):
 def fix_history_and_revalidate(*args):
     """Construction Historyを修正し、修正後に再検証する。"""
 
+    import importlib
+    import fix_history
+    
+    importlib.reload(fix_history)
+
     # 元の選択状態を保存
     selected = cmds.ls(
         selection=True,
@@ -829,11 +882,100 @@ def fix_history_and_revalidate(*args):
          for name in selected_names
     )
 
+    # メッシュとメッシュ以外を分類する
+    history_candidates = []
+    skipped_objects = []
+
+    for obj in selected:
+        shapes = cmds.listRelatives(
+            obj,
+            shapes=True,
+            noIntermediate=True,
+            fullPath=True
+        ) or []
+
+        mesh_shapes = [
+            shapes
+            for shape in shapes
+            if cmds.nodeType(shape) == "mesh"
+        ]
+
+        object_name = obj.split("|")[-1]
+
+        if not mesh_shapes:
+            skipped_objects.append(
+                (object_name,"メッシュShapeがありません")
+            )
+            continue
+
+        # Construction Historyを調べる
+        history = cmds.listHistory(
+            obj,
+            pruneDagObjects=True
+        ) or []
+
+        if not history:
+            skipped_objects.append(
+                (object_name,"Construction Historyがありません")
+            )
+            continue
+
+        # 履歴ノードの種類を調べる
+        history_types = {
+            node: cmds.nodeType(node)
+            for node in history
+        }
+
+        unsupported_nodes = [
+            node
+            for node, node_type in history_types.items()
+            if node_type not in fix_history.ALLOWED_HISTORY_TYPES
+        ]
+
+        if unsupported_nodes:
+            node_details = ",".join(
+                "{} ({})".format(
+                    node,
+                    history_types[node]
+                )
+                for node in unsupported_nodes
+            )
+
+            skipped_objects.append(
+                (
+                    object_name,
+                    "対応対象外の履歴:" + node_details
+                )
+            )
+        else:
+            history_candidates.append(object_name)
+
+    # 削除対象の一覧
+    if history_candidates:
+        history_list = "\n".join(
+            "- " + name
+            for name in history_candidates
+        )
+    else:
+        history_list = "なし"
+
+    # スキップ対象と理由の一覧
+    if skipped_objects:
+        skipped_list = "\n".join(
+            "- {}：{}".format(name, reason)
+            for name, reason in skipped_objects
+        )
+    else:
+        skipped_list = "なし"
+
+    # 確認ダイアログに表示する文章
     message = (
-        "次の選択対象を処理します。\n\n"
-        + object_list
-        + "\n\n対応するメッシュのConstruction Historyを削除します。\n"
-        "メッシュ以外や対応対象外の履歴は、処理を見送ります。\n\n"
+        "Construction Historyの処理対象を確認してください。\n\n"
+        "【削除対象】\n"
+        + history_list
+        + "\n\n【スキップ対象】\n"
+        + skipped_list
+        + "\n\n削除対象のメッシュからConstruction Historyを削除します。\n"
         "削除後は、モデリング操作の履歴を編集できなくなります。\n"
         "続行しますか？"
     )
@@ -870,10 +1012,6 @@ def fix_history_and_revalidate(*args):
             "skipped_results": []
         }
 
-    import importlib
-    import fix_history
-
-    importlib.reload(fix_history)
 
     #  Construction Historyを修正
     fix_results = fix_history.fix_selected_history()
