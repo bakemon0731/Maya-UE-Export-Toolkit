@@ -736,6 +736,180 @@ def fix_transforms_and_revalidate(*args):
         "failed_results": failed_results
     }
           
+def fix_history_and_revalidate(*args):
+    """Construction Historyを修正し、修正後に再検証する。"""
+
+    # 元の選択状態を保存
+    selected = cmds.ls(
+        selection=True,
+        long=True,
+        type="transform"
+    ) or []
+
+    # 未選択の場合は終了
+    if not selected:
+        message = "オブジェクトが選択されていません。処理を中止しました。"
+
+        print(message)
+
+        cmds.scrollField(
+            OUTPUT_FIELD,
+            edit=True,
+            text=message
+        )
+
+        return {
+            "fix_results": [],
+            "validation_results": [],
+            "failed_results": [{
+                "status": "ERROR",
+                "message": message
+            }]
+        }
+
+    import importlib
+    import fix_history
+
+    importlib.reload(fix_history)
+
+    #  Construction Historyを修正
+    fix_results = fix_history.fix_selected_history()
+
+    output_lines = ["=== Construction History自動修正の結果 ==="]
+
+    for result in fix_results:
+        output_lines.append(
+            "対象: {} | 状態: {} | 内容: {}".format(
+                result.get("object"),
+                result.get("status"),
+                result.get("message")
+            )
+        )
+
+    #  修正に失敗した結果を抽出
+    fix_errors = [
+        result
+        for result in fix_results
+        if result.get("status") == "ERROR"
+    ]
+
+    # ERRORがあれば再検証を中止
+    if fix_errors:
+        output_lines.append("")
+        output_lines.append(
+            "履歴の修正に失敗したため、再検証を中止しました。"
+        )
+
+        output_text = "\n".join(output_lines)
+        print(output_text)
+
+        cmds.scrollField(
+            OUTPUT_FIELD,
+            edit=True,
+            text=output_text
+        )
+
+        return {
+            "fix_results": fix_results,
+            "validation_results": [],
+            "failed_results": fix_errors
+        }
+
+    #  修正に成功した結果を抽出
+    fix_successes = [
+        result
+        for result in fix_results
+        if result.get("status") == "OK"
+        and result.get("object")
+    ]
+
+    fix_skips = [
+        result
+        for result in fix_results
+        if result.get("status") == "SKIP"
+    ]
+
+    # 修正に成功したメッシュがない場合は終了
+    if not fix_successes:
+        output_lines.append("")
+        output_lines.append(
+            "自動修正できるメッシュがないため、再検証を中止しました。"
+        )
+
+        output_text = "\n".join(output_lines)
+        print(output_text)
+
+        cmds.scrollField(
+            OUTPUT_FIELD,
+            edit=True,
+            text=output_text
+        )
+
+        return {
+            "fix_results": fix_results,
+            "validation_results": [],
+            "failed_results": [],
+            "skipped_results": fix_skips
+        }
+
+    #  修正成功したメッシュだけを再検証する
+    successful_objects = [
+        result["object"]
+        for result in fix_successes
+    ]
+
+    try:
+        cmds.select(successful_objects, replace=True)
+        validation_results = run_all_checks()
+
+    finally:
+        # 元の選択状態に戻す
+        cmds.select(selected, replace=True)
+
+    #  再検証結果を集計
+    failed_results = [
+        result
+        for result in validation_results
+        if result.get("status") != "OK"
+    ]
+
+    output_lines.append("")
+    output_lines.append("=== 修正後の再検証結果 ===")
+    output_lines.append(
+        "検証件数: {}".format(len(validation_results))
+    )
+    output_lines.append(
+        "要確認件数: {}".format(len(failed_results))
+    )
+
+    for result in validation_results:
+        output_lines.append(
+            "対象: {} | 検証: {} | 状態: {} | 内容: {}".format(
+                result.get("object"),
+                result.get("check"),
+                result.get("status"),
+                result.get("message")
+            )
+        )
+
+    output_text = "\n".join(output_lines)
+    print(output_text)
+
+    cmds.scrollField(
+        OUTPUT_FIELD,
+        edit=True,
+        text=output_text
+    )
+
+    return {
+        "fix_results": fix_results,
+        "validation_results": validation_results,
+        "failed_results": failed_results,
+        "skipped_results": fix_skips
+    }
+
+
+
 
 def show_ui():
     """検証ツールのウィンドウを表示する。"""
@@ -813,6 +987,12 @@ def show_ui():
         label = "Transform自動修正して再検証",
         height=40,
         command=fix_transforms_and_revalidate
+    )
+
+    cmds.button(
+        label = "Construction History自動修正して再検証",
+        height=40,
+        command=fix_history_and_revalidate
     )
 
     cmds.button(
