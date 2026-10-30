@@ -294,6 +294,31 @@ def run_uv_check(*args):
         text=output_text
     )
 
+def get_recommended_action(check_name):
+    """検証項目に応じた対応方法を返す。"""
+
+    action_guidance = {
+        "命名規則":
+            "オブジェクト名を命名規則に合わせて修正してください。",
+
+        "Transform":
+            "Transform自動修正機能を実行し、再検証してください。",
+
+        "Construction History":
+            "Construction History自動修正機能を実行してください。",
+
+        "N-gon":
+            "該当する面を確認し、必要に応じてトポロジーを修正してください。",
+
+        "UV":
+            "UVセットとUV座標を確認し、必要に応じてUVを設定してください。"
+    }
+
+    # 検証項目に対応する案内文を返す
+    return action_guidance.get(
+        check_name,
+        "対応方法を確認してください。"
+    )
 
 def run_all_checks(*args):
     """5つの検証を実行し、結果をGUIにまとめて表示する。"""
@@ -484,6 +509,16 @@ def run_all_checks(*args):
                 "内容: {}".format(
                     result.get("message", "詳細不明")
                 )
+            )
+
+            # 検証項目に対応する案内文を取得する
+            action = get_recommended_action(
+                result.get("check", "")
+            )
+
+            # 対応方法を表示する
+            lines.append(
+                "対応方法: " + action 
             )
 
             lines.append("")
