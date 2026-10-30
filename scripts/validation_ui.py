@@ -333,71 +333,188 @@ def run_all_checks(*args):
             results = check_function() or []
             all_results.extend(results)
 
-        except Exception as error:
+        except Exception as caught_exception:
             errors.append({
                 "check": label,
-                "type": type(error).__name__,
-                "message": str(error)
+                "type": type(caught_exception).__name__,
+                "message": str(caught_exception)
             })
 
     # GUIに表示する文章を作成する
     lines = []
+
     lines.append("===== 全項目チェック結果 =====")
     lines.append("")
 
-    # 各検証結果を表示する
+    # オブジェクトごとに検証結果を整理する辞書
+    object_results = {}
+
+
+
+    # すべての検証結果をオブジェクト単位に分類する
     for result in all_results:
-        lines.append("オブジェクト: " + result.get("object", "不明"))
-        lines.append("検証項目: " + result.get("check", "不明"))
-        lines.append("結果: " + result.get("status", "不明"))
-        lines.append("説明: " + result.get("message", ""))
+        object_name = result.get("object") or "不明"
 
-        details = result.get("details", [])
+        # まだ辞書にオブジェクト名がなければ、空のリストを作る
+        if object_name not in object_results:
+            object_results[object_name] = []
 
-        if details:
-            lines.append("追加情報:")
+        # そのオブジェクトの検証結果を追加する
+        object_results[object_name].append(result)
 
-            for detail in details:
-                if isinstance(detail, dict):
-                    for key, value in detail.items():
-                        lines.append(
-                            " " + str(key) + ": " + str(value)
-                        )
-                else:
-                    lines.append(" " + str(detail))
-        
+    # オブジェクトごとに検証結果を表示する
+    for object_name, results in object_results.items():
+
+        lines.append("オブジェクト:" + object_name)
         lines.append("")
 
-    # OKとNGの検証結果を集計する
+        # そのオブジェクトの検証結果を1件ずつ表示する
+        for result in results:
+
+            lines.append(
+                "[{}] {}".format(
+                    result.get("status","不明"),
+                    result.get("check","不明")
+                )
+            )
+
+            lines.append(
+                " 説明: " + result.get("message", "")
+            )
+
+            # 追加情報を取得する
+            details = result.get("details",[])
+
+            if details:
+                lines.append(" 追加情報:")
+
+                for detail in details:
+                    if isinstance(detail,dict):
+                        for key, value in detail.items():
+                            lines.append(
+                                "  {}: {}".format(key, value)
+                            )
+
+                    else:
+                        lines.append("  " + str(detail))
+
+            lines.append("")
+
+    # 検証結果のステータスごとに件数を集計する
+    # OKの件数
     ok_count = sum(
-        1 for result in all_results
+        1
+        for result in all_results
         if result.get("status") == "OK"
     )
 
+    # NGの件数
     ng_count = sum(
-        1 for result in all_results
+        1
+        for result in all_results
         if result.get("status") == "NG"
     )
+
+    # SKIPの件数
+    skip_count = sum(
+        1
+        for result in all_results
+        if result.get("status") == "SKIP"
+    )
+
+    # 検証結果として返されたERRORの件数
+    result_error_count = sum(
+        1
+        for result in all_results
+        if result.get("status") == "ERROR"
+    )
+
+    # 例外として捕捉されたエラーの件数
+    exception_count = len(errors)
+
+    # ERRORの合計
+    error_count = result_error_count + exception_count
 
     # 最後に集計結果を表示する
     lines.append("===== 実行サマリー =====")
     lines.append("検証対象オブジェクト数: " + str(len(selected)))
     lines.append("取得した検証結果数: " + str(len(all_results)))
-    lines.append("検証OK件数: " + str(ok_count))
-    lines.append("検証NG件数: " + str(ng_count))
-    lines.append("例外が発生した数: " + str(len(errors)))
+    lines.append("OK件数: " + str(ok_count))
+    lines.append("NG件数: " + str(ng_count))
+    lines.append("SKIP件数: " + str(skip_count))
+    lines.append("ERROR件数: " + str(error_count))
+    lines.append("例外が発生した数: " + str(exception_count))
 
-    # エラーがあれば、その内容も表示する
-    if errors:
+
+   # NGとERRORの検証結果を抽出する
+    problem_results = [
+        result
+        for result in all_results
+        if result.get("status") in ("NG", "ERROR")
+    ]
+
+    # NGまたはERRORが存在する場合だけ一覧を表示する
+    if problem_results or errors:
+
         lines.append("")
-        lines.append("===== エラー詳細 =====")
+        lines.append("===== 要対応項目 =====")
 
-        for error in errors:
-            lines.append("検証項目: " + error["check"])
-            lines.append("エラーの種類: " + error["type"])
-            lines.append("エラーの詳細: " + error["message"])
+        # 検証結果として返されたNG・ERRORを表示する
+        for result in problem_results:
+
+            lines.append(
+                "対象オブジェクト: {}".format(
+                    result.get("object", "不明")
+                )
+            )
+
+            lines.append(
+                "検証項目: {}".format(
+                    result.get("check", "不明")
+                )
+            )
+
+            lines.append(
+                "状態: {}".format(
+                    result.get("status", "不明")
+                )
+            )
+
+            lines.append(
+                "内容: {}".format(
+                    result.get("message", "詳細不明")
+                )
+            )
+
             lines.append("")
 
+        # 例外として発生したERRORも表示する
+        for exception_info in errors:
+
+            lines.append(
+                "検証項目: {}".format(
+                    exception_info.get("check", "不明")
+                )
+            )
+
+            lines.append("状態: ERROR（例外）")
+
+            lines.append(
+                "エラーの種類: {}".format(
+                    exception_info.get("type", "不明")
+                )
+            )
+
+            lines.append(
+                "エラーの詳細: {}".format(
+                    exception_info.get("message", "詳細不明")
+                )
+            )
+
+            lines.append("")
+
+    # GUIに表示する文章を作成する
+    # 要対応項目がない場合でも、サマリーを表示する
     output_text = "\n".join(lines)
 
     # GUIの表示欄を更新する
@@ -407,6 +524,7 @@ def run_all_checks(*args):
         text=output_text
     )
 
+    # 呼び出し元でも検証結果を利用できるように返す
     return all_results
 
 def validate_and_export(*args):
