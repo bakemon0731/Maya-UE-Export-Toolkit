@@ -626,7 +626,7 @@ def fix_transforms_and_revalidate(*args):
             for name in skipped_objects
         )
     else:
-        skipped_objects = "なし"
+        skipped_list = "なし"
 
 
    # 確認ダイアログに表示する文章
@@ -1175,30 +1175,44 @@ def show_ui():
         WINDOW_NAME,
         title="Maya → Unreal 検証ツール",
         sizeable=True,
-        widthHeight=(480, 400)
+        widthHeight=(520, 720)
     )
 
-    # 縦方向にUI部品を配置する
+    # 全体をスクロール可能にする
+    cmds.scrollLayout(
+        childResizable=True
+    )
+
+    # 全体の縦方向レイアウト
     cmds.columnLayout(
         adjustableColumn=True,
-        rowSpacing=8
+        rowSpacing=10
+    )
+
+    # ツールの説明
+    cmds.text(
+        label="MayaからUnreal Engineへの出力前チェックツール",
+        align="left",
+        height=30
+    )
+
+    # ==================================
+    # 01. 検証
+    # ==================================
+
+    cmds.frameLayout(
+        label="01 | VALIDATION - 検証",
+        collapsable=True,
+        collapse=False,
+        marginWidth=8,
+        marginHeight=6
     )
 
     cmds.text(
-        label="選択したオブジェクトの命名規則を検証します。",
+        label="選択したメッシュの問題を検出します。",
         align="left"
     )
 
-    # 検証結果の表示欄
-    global OUTPUT_FIELD
-
-    OUTPUT_FIELD = cmds.scrollField(
-        editable=False,
-        wordWrap=True,
-        text="オブジェクトを選択して、チェックボタンを押してください。"
-    )
-
-    # チェックボタン
     cmds.button(
         label="命名規則チェック",
         height=35,
@@ -1212,49 +1226,133 @@ def show_ui():
     )
 
     cmds.button(
-        label = "Construction Historyチェック",
+        label="Cunstruction Historyチェック",
         height=35,
         command=run_history_check
     )
 
     cmds.button(
-        label = "N-gonチェック",
+        label="N-gonチェック",
         height=35,
         command=run_ngon_check
     )
 
     cmds.button(
-        label = "UVチェック",
-        height= 35,
+        label="UVチェック",
+        height=35,
         command=run_uv_check
     )
 
     cmds.button(
-        label = "全項目チェック",
+        label="全項目チェック",
         height=40,
         command=run_all_checks
     )
 
+    # columnLayoutを抜ける
+    cmds.setParent("..")
+
+    # frameLayoutを抜ける
+    cmds.setParent("..")
+
+    # ==================================
+    # 02. 自動修正
+    # ==================================
+
+    cmds.frameLayout(
+        label="02 | AUTO FIX - 自動修正",
+        collapsable=True,
+        collapse=False,
+        marginWidth=8,
+        marginHeight=6
+    )
+
+    cmds.columnLayout(
+        adjustableColumn=True,
+        rowSpacing=5
+    )
+
+    cmds.text(
+        label="検出された問題を修正して再検証します。",
+        align="left"
+    )
+
     cmds.button(
-        label = "Transform自動修正して再検証",
+        label="Transform自動修正して再検証",
         height=40,
         command=fix_transforms_and_revalidate
     )
 
     cmds.button(
-        label = "Construction History自動修正して再検証",
+        label="Construction History自動修正して再検証",
         height=40,
         command=fix_history_and_revalidate
     )
 
-    cmds.button(
-        label = "検証してFBX書き出し",
-        height=40,
-        command= validate_and_export
+    cmds.setParent("..")
+    cmds.setParent("..")
+
+    # ==================================
+    # 03. FBX書き出し
+    # ==================================
+
+    cmds.frameLayout(
+        label="03 | EXPORT - FBX書き出し",
+        collapsable=True,
+        collapse=False,
+        marginWidth=8,
+        marginHeight=6
     )
+
+    cmds.columnLayout(
+        adjustableColumn=True,
+        rowSpacing=5
+    )
+
+    cmds.text(
+        label="検証に合格したメッシュをFBXで出力します。",
+        align="left"
+    )
+
+    cmds.button(
+        label="検証してFBX書き出し",
+        height=45,
+        command=validate_and_export
+    )
+
+    cmds.setParent("..")
+    cmds.setParent("..")
+
+    # ==================================
+    # 04. 実行結果
+    # ==================================
+
+    cmds.frameLayout(
+        label="04 | RESULT - 実行結果",
+        collapsable=True,
+        collapse=False,
+        marginWidth=8,
+        marginHeight=6
+    )
+
+    cmds.columnLayout(
+        adjustableColumn=True,
+        rowSpacing=5
+    )
+
+    global OUTPUT_FIELD
+
+    OUTPUT_FIELD = cmds.scrollField(
+        editable=False,
+        wordWrap=True,
+        text="実行結果がここに表示されます。",
+        height=180
+    )
+
+    cmds.setParent("..")
+    cmds.setParent("..")
 
     # ウィンドウを表示する
     cmds.showWindow(window)
-
 
 show_ui()

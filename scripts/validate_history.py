@@ -1,5 +1,4 @@
 from unittest import result
-
 import maya.cmds as cmds 
 
 # 1つのオブジェクトの履歴を調べる

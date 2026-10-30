@@ -45,6 +45,7 @@ def export_selected_fbx():
         file_path += ".fbx"
 
     try:
+
         # FBXプラグインが読み込まれているか確認する
         if not cmds.pluginInfo(
             "fbxmaya",
@@ -91,6 +92,7 @@ def export_selected_fbx():
 
         return result
 
+    #tryエラーが発生した場合実行される
     except Exception as error:
         result = {
             "status": "ERROR",
