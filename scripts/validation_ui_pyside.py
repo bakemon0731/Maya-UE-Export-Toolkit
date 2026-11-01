@@ -31,6 +31,7 @@ import validate_uvs
 
 import fix_transforms
 import fix_history
+import fix_names
 
 import export_fbx
 
@@ -444,7 +445,10 @@ def finish_fix_and_revalidate(
 
     append_fix_results(lines, fix_results)
 
+    # =====================================
     # ERRORを抽出
+    # =====================================
+
     fix_errors = [
         result
         for result in fix_results
@@ -463,7 +467,10 @@ def finish_fix_and_revalidate(
 
         return
 
+    # =====================================
     # 修正に成功したオブジェクトを取得
+    # =====================================
+
     fix_successes = [
         result
         for result in fix_results
@@ -488,7 +495,41 @@ def finish_fix_and_revalidate(
 
         return
 
-    # 成功したオブジェクトだけ再検証
+    # =====================================
+    # 修正前・修正後のパスを対応付ける
+    # =====================================
+
+    selection_mapping = {}
+
+    for result in fix_results:
+
+        details = result.get("details", [])
+
+        for detail in details:
+
+            if isinstance(detail, dict):
+
+                old_path = detail.get("変更前パス")
+                new_path = detail.get("変更後パス")
+
+                if old_path and new_path:
+
+                    selection_mapping[old_path] = new_path
+
+    # 修正前のパスを修正後のパスに置き換える
+    selection_to_restore = [
+        selection_mapping.get(obj, obj)
+        for obj in selected
+    ]
+
+    # =====================================
+    # 修正後の再検証
+    # =====================================
+
+    validation_data = None
+
+    selection_restore_error = None
+
     try:
 
         cmds.select(
@@ -502,15 +543,70 @@ def finish_fix_and_revalidate(
             display=False
         )
 
-    finally:
+    except Exception as error:
 
-        # 元の選択状態に戻す
-        cmds.select(
-            selected,
-            replace=True
+        lines.append("")
+        lines.append(
+            "再検証中にエラーが発生しました: {}".format(error)
         )
 
+    finally:
+
+        # =================================
+        # 元の選択状態を復元
+        # =================================
+
+        try:
+
+            valid_selection = [
+                obj
+                for obj in selection_to_restore
+                if cmds.objExists(obj)
+            ]
+
+            if valid_selection:
+
+                cmds.select(
+                    valid_selection,
+                    replace=True
+                )
+
+            else:
+
+                cmds.select(clear=True)
+
+        except Exception as error:
+
+            selection_restore_error = str(error)
+
+    # =====================================
+    # 再検証結果が取得できなかった場合
+    # =====================================
+
+    if validation_data is None:
+
+        if selection_restore_error:
+
+            lines.append(
+                "選択状態の復元エラー: {}".format(
+                    selection_restore_error
+                )
+            )
+
+        result_view.setPlainText(
+            "\n".join(lines)
+        )
+
+        print("\n".join(lines))
+
+        return
+
+    # =====================================
+    # 再検証結果の取得
+    # =====================================
+
     validation_results = validation_data["results"]
+
     validation_errors = validation_data["errors"]
 
     failed_results = [
@@ -523,18 +619,27 @@ def finish_fix_and_revalidate(
     lines.append("===== 修正後の再検証結果 =====")
 
     lines.append(
-        "検証件数: {}".format(len(validation_results))
+        "検証件数: {}".format(
+            len(validation_results)
+        )
     )
 
     lines.append(
-        "要確認件数: {}".format(len(failed_results))
+        "要確認件数: {}".format(
+            len(failed_results)
+        )
     )
+
+    # =====================================
+    # 個別の検証結果
+    # =====================================
 
     for result in validation_results:
 
         object_name = result.get("object", "不明")
 
         if isinstance(object_name, str):
+
             object_name = object_name.split("|")[-1]
 
         lines.append(
@@ -546,6 +651,10 @@ def finish_fix_and_revalidate(
             )
         )
 
+    # =====================================
+    # 再検証エラーの表示
+    # =====================================
+
     if validation_errors:
 
         lines.append("")
@@ -554,22 +663,170 @@ def finish_fix_and_revalidate(
         for error_info in validation_errors:
 
             lines.append(
-                "検証項目: {}".format(error_info["check"])
+                "検証項目: {}".format(
+                    error_info["check"]
+                )
             )
 
             lines.append(
-                "種類: {}".format(error_info["type"])
+                "種類: {}".format(
+                    error_info["type"]
+                )
             )
 
             lines.append(
-                "内容: {}".format(error_info["message"])
+                "内容: {}".format(
+                    error_info["message"]
+                )
             )
+
+    # =====================================
+    # 選択状態の復元エラー
+    # =====================================
+
+    if selection_restore_error:
+
+        lines.append("")
+        lines.append(
+            "選択状態の復元エラー: {}".format(
+                selection_restore_error
+            )
+        )
+
+    # =====================================
+    # 最終結果表示
+    # =====================================
 
     output_text = "\n".join(lines)
 
     result_view.setPlainText(output_text)
 
     print(output_text)
+
+# =========================================
+# 09. 命名規則自動修正
+# =========================================
+
+def run_name_auto_fix(
+    result_view,
+    validation_checks,
+    parent
+):
+
+    selected = cmds.ls(
+        selection=True,
+        long=True,
+        type="transform"
+    ) or []
+
+    if not selected:
+
+        result_view.setPlainText(
+            "オブジェクトが選択されていません。\n"
+            "命名規則の自動修正を中止しました。"
+        )
+
+        return
+
+    fix_candidates = []
+    skipped_objects = []
+
+    for obj in selected:
+
+        object_name = obj.split("|")[-1]
+
+        shapes = cmds.listRelatives(
+            obj,
+            shapes=True,
+            noIntermediate=True,
+            fullPath=True
+        ) or []
+
+        mesh_shapes = [
+            shape
+            for shape in shapes
+            if cmds.nodeType(shape) == "mesh"
+        ]
+
+        if not mesh_shapes:
+
+            skipped_objects.append(object_name)
+
+            continue
+
+        if not object_name.startswith("SM_"):
+
+            fix_candidates.append(object_name)
+
+    if not fix_candidates:
+
+        result_view.setPlainText(
+            "命名規則の修正対象がありません。\n"
+            "すべてのメッシュがSM_で始まっています。"
+        )
+
+        return
+
+    fix_list = "\n".join(
+        "- " + name
+        for name in fix_candidates
+    )
+
+    skipped_list = "\n".join(
+        "- " + name
+        for name in skipped_objects
+    ) if skipped_objects else "なし"
+
+    message = (
+        "命名規則の自動修正対象を確認してください。\n\n"
+        "【修正対象】\n"
+        + fix_list
+        + "\n\n【スキップ対象】\n"
+        + skipped_list
+        + "\n\n対象のオブジェクト名の先頭にSM_を追加します。\n\n"
+        "続行しますか？"
+    )
+
+    confirmed = ask_confirmation(
+        parent,
+        "命名規則自動修正の確認",
+        message
+    )
+
+    if not confirmed:
+
+        result_view.setPlainText(
+            "命名規則の自動修正をキャンセルしました。"
+        )
+
+        return
+
+    try:
+
+        importlib.reload(fix_names)
+
+        fix_results = fix_names.fix_selected_names()
+
+        finish_fix_and_revalidate(
+            result_view,
+            validation_checks,
+            selected,
+            fix_results,
+            "命名規則自動修正"
+        )
+
+    except Exception as error:
+
+        message = (
+            "命名規則の自動修正中にエラーが発生しました: {}".format(
+                error
+            )
+        )
+
+        result_view.setPlainText(message)
+
+        print(message)
+
 
 
 # =========================================
@@ -1074,6 +1331,7 @@ def show_ui():
 
     importlib.reload(fix_transforms)
     importlib.reload(fix_history)
+    importlib.reload(fix_names)
     importlib.reload(export_fbx)
 
     # 検証関数一覧
@@ -1268,6 +1526,24 @@ def show_ui():
             )
     )
 
+    # 命名規則自動修正
+    name_fix_button = QtWidgets.QPushButton(
+        "命名規則自動修正・再検証"
+    )
+
+    name_fix_button.setObjectName(
+        "fixButton"
+    )
+
+    name_fix_button.clicked.connect(
+        lambda checked=False:
+            run_name_auto_fix(
+                result_view,
+                validation_checks,
+                WINDOW
+            )
+    )
+
     auto_fix_layout.addWidget(
         transform_fix_button,
         0, 0
@@ -1276,6 +1552,11 @@ def show_ui():
     auto_fix_layout.addWidget(
         history_fix_button,
         0, 1
+    )
+
+    auto_fix_layout.addWidget(
+        name_fix_button,
+        1, 0, 1, 2
     )
 
     main_layout.addWidget(auto_fix_group)
