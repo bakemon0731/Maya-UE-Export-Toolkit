@@ -1,4 +1,4 @@
-
+import os
 import sys
 import importlib
 
@@ -13,7 +13,8 @@ from shiboken6 import wrapInstance
 # 01. パス設定
 # =========================================
 
-SCRIPT_DIR = r"E:\Maya-UE-Export-Toolkit\scripts"
+SCRIPT_DIR = os.path.dirname(
+    os.path.abspath(__file__))
 
 if SCRIPT_DIR not in sys.path:
     sys.path.insert(0, SCRIPT_DIR)
