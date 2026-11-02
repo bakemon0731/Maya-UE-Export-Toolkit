@@ -2,41 +2,276 @@ import os
 import sys
 import time
 import json
+import glob
 import traceback
+import importlib.util
 
 
 # =========================================
-# 01. Unreal EngineのPythonパス
+# 01. Unreal Engineの設定
 # =========================================
 
-UE_PYTHON_DIR = (
-    r"C:\Program Files\Epic Games\UE_5.6"
-    r"\Engine\Plugins\Experimental"
-    r"\PythonScriptPlugin\Content\Python"
+# 特定のインストール先を使用する場合だけ指定する
+# 自動検出する場合はNoneのままにする
+
+UE_ENGINE_ROOT = None
+
+# 例：
+# UE_ENGINE_ROOT = r"D:\Epic Games\UE_5.6"
+
+
+# =========================================
+# 02. UEインストール先の検出
+# =========================================
+
+def find_ue_python_dir():
+
+    candidates = []
+
+    # -------------------------------------
+    # 手動指定されたパス
+    # -------------------------------------
+
+    if UE_ENGINE_ROOT:
+
+        candidates.append(UE_ENGINE_ROOT)
+
+    # -------------------------------------
+    # Epic Games Launcherの情報を取得
+    # -------------------------------------
+
+    program_data = os.environ.get(
+        "PROGRAMDATA",
+        r"C:\ProgramData"
+    )
+
+    launcher_manifest = os.path.join(
+        program_data,
+        "Epic",
+        "UnrealEngineLauncher",
+        "LauncherInstalled.dat"
+    )
+
+    if os.path.isfile(launcher_manifest):
+
+        try:
+
+            with open(
+                launcher_manifest,
+                "r",
+                encoding="utf-8"
+            ) as file:
+
+                manifest_data = json.load(file)
+
+            installations = manifest_data.get(
+                "InstallationList",
+                []
+            )
+
+            for installation in installations:
+
+                install_location = installation.get(
+                    "InstallLocation"
+                )
+
+                if install_location:
+
+                    candidates.append(
+                        install_location
+                    )
+
+        except Exception as error:
+
+            print(
+                "Launcher情報の読み込みに失敗しました: {}".format(
+                    error
+                )
+            )
+
+    # -------------------------------------
+    # 新しいLauncherのマニフェストも確認
+    # -------------------------------------
+
+    manifest_directory = os.path.join(
+        program_data,
+        "Epic",
+        "EpicGamesLauncher",
+        "Data",
+        "Manifests"
+    )
+
+    manifest_files = glob.glob(
+        os.path.join(
+            manifest_directory,
+            "*.item"
+        )
+    )
+
+    for manifest_file in manifest_files:
+
+        try:
+
+            with open(
+                manifest_file,
+                "r",
+                encoding="utf-8"
+            ) as file:
+
+                data = json.load(file)
+
+            install_location = data.get(
+                "InstallLocation"
+            )
+
+            if install_location:
+
+                candidates.append(
+                    install_location
+                )
+
+        except Exception:
+
+            continue
+
+    # -------------------------------------
+    # 一般的なインストール先も確認
+    # -------------------------------------
+
+    common_directories = [
+        r"C:\Program Files\Epic Games",
+        r"C:\Epic Games",
+        r"D:\Epic Games",
+        r"E:\Epic Games",
+        r"F:\Epic Games"
+    ]
+
+    for directory in common_directories:
+
+        if not os.path.isdir(directory):
+            continue
+
+        candidates.extend(
+            glob.glob(
+                os.path.join(
+                    directory,
+                    "UE_*"
+                )
+            )
+        )
+
+    # -------------------------------------
+    # 重複を除去
+    # -------------------------------------
+
+    unique_candidates = []
+
+    seen = set()
+
+    for candidate in candidates:
+
+        normalized = os.path.normcase(
+            os.path.normpath(candidate)
+        )
+
+        if normalized in seen:
+            continue
+
+        seen.add(normalized)
+
+        unique_candidates.append(candidate)
+
+    # -------------------------------------
+    # remote_execution.pyを検索
+    # -------------------------------------
+
+    for engine_root in unique_candidates:
+
+        python_dir = os.path.join(
+            engine_root,
+            "Engine",
+            "Plugins",
+            "Experimental",
+            "PythonScriptPlugin",
+            "Content",
+            "Python"
+        )
+
+        remote_file = os.path.join(
+            python_dir,
+            "remote_execution.py"
+        )
+
+        if os.path.isfile(remote_file):
+
+            print(
+                "Unreal Engineを検出しました:"
+            )
+
+            print(engine_root)
+
+            print(
+                "Remote Execution: {}".format(
+                    remote_file
+                )
+            )
+
+            return python_dir
+
+    return None
+
+
+# =========================================
+# 03. Remote Executionの読み込み
+# =========================================
+
+UE_PYTHON_DIR = find_ue_python_dir()
+
+if UE_PYTHON_DIR is None:
+
+    raise FileNotFoundError(
+        "Unreal Engineのremote_execution.pyを"
+        "自動検出できませんでした。\n\n"
+        "UE_ENGINE_ROOTにUEのインストール先を"
+        "指定してください。"
+    )
+
+
+REMOTE_EXECUTION_FILE = os.path.join(
+    UE_PYTHON_DIR,
+    "remote_execution.py"
 )
 
 
-# =========================================
-# 02. Remote Execution読み込み
-# =========================================
+# -----------------------------------------
+# 指定したファイルからモジュールを読み込む
+# -----------------------------------------
 
-if not os.path.isdir(UE_PYTHON_DIR):
+spec = importlib.util.spec_from_file_location(
+    "maya_ue_remote_execution",
+    REMOTE_EXECUTION_FILE
+)
 
-    raise FileNotFoundError(
-        "Unreal EngineのPythonフォルダが見つかりません。\n"
-        + UE_PYTHON_DIR
+if spec is None or spec.loader is None:
+
+    raise ImportError(
+        "Remote Executionモジュールを読み込めません。"
     )
 
+remote_module = importlib.util.module_from_spec(
+    spec
+)
 
-if UE_PYTHON_DIR not in sys.path:
+sys.modules[spec.name] = remote_module
 
-    sys.path.insert(
-        0,
-        UE_PYTHON_DIR
-    )
+spec.loader.exec_module(
+    remote_module
+)
+
+RemoteExecution = remote_module.RemoteExecution
 
 
-from remote_execution import RemoteExecution
+print("Remote Executionの読み込みに成功しました。")
 
 
 # =========================================
