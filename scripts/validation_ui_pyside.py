@@ -16,9 +16,15 @@ from shiboken6 import wrapInstance
 SCRIPT_DIR = os.path.dirname(
     os.path.abspath(__file__))
 
-if SCRIPT_DIR not in sys.path:
-    sys.path.insert(0, SCRIPT_DIR)
+UE_EXPORT_TOOLKIT_DIR = os.path.join(
+    SCRIPT_DIR, 
+    "ue")
 
+for directory in [SCRIPT_DIR, UE_EXPORT_TOOLKIT_DIR]:
+
+    if directory not in sys.path:
+
+        sys.path.insert(0, directory)
 
 # =========================================
 # 02. モジュール読み込み
@@ -1295,7 +1301,356 @@ def run_validate_and_export(
 
 
 # =========================================
-# 12. UI作成
+# 12. 検証・FBX書き出し・UEインポート
+# =========================================
+
+def run_validate_export_and_import(
+    result_view,
+    validation_checks,
+    destination_input
+):
+    """全項目検証後、FBXを書き出してUEへインポートする。"""
+
+    lines = []
+
+    # =====================================
+    # 01. 選択状態の確認
+    # =====================================
+
+    selected = cmds.ls(
+        selection=True,
+        long=True,
+        type="transform"
+    ) or []
+
+    if not selected:
+
+        result_view.setPlainText(
+            "オブジェクトを選択してください。\n"
+            "UEへの送信を中止しました。"
+        )
+
+        return
+
+    # =====================================
+    # 02. UE保存先の確認
+    # =====================================
+
+    destination_path = destination_input.text().strip()
+
+    if not destination_path.startswith("/Game/"):
+
+        result_view.setPlainText(
+            "UEの保存先が正しくありません。\n\n"
+            "保存先は /Game/ から始まる必要があります。\n"
+            "例：/Game/MayaImports"
+        )
+
+        return
+
+    # =====================================
+    # 03. 全項目検証
+    # =====================================
+
+    validation_data = run_all_validations(
+        result_view,
+        validation_checks,
+        display=True
+    )
+
+    results = validation_data["results"]
+
+    errors = validation_data["errors"]
+
+    if not results:
+
+        lines.append("===== UE送信判定 =====")
+        lines.append("検証結果を取得できませんでした。")
+        lines.append("UEへの送信を中止しました。")
+
+        if errors:
+
+            for error_info in errors:
+
+                lines.append(
+                    "{}: {}".format(
+                        error_info["check"],
+                        error_info["message"]
+                    )
+                )
+
+        result_view.setPlainText(
+            "\n".join(lines)
+        )
+
+        return
+
+    # =====================================
+    # 04. NG・SKIP・ERRORの確認
+    # =====================================
+
+    failed_results = [
+        result
+        for result in results
+        if result.get("status") != "OK"
+    ]
+
+    if failed_results or errors:
+
+        lines.append(
+            result_view.toPlainText()
+        )
+
+        lines.append("")
+        lines.append("===== UE送信判定 =====")
+
+        lines.append(
+            "検証に問題があるため、UEへの送信を中止しました。"
+        )
+
+        return_text = []
+
+        for result in failed_results:
+
+            object_name = result.get(
+                "object",
+                "不明"
+            )
+
+            lines.append(
+                "対象: {} | 検証: {} | 状態: {} | 内容: {}".format(
+                    object_name,
+                    result.get("check", "不明"),
+                    result.get("status", "不明"),
+                    result.get("message", "")
+                )
+            )
+
+        for error_info in errors:
+
+            lines.append(
+                "検証例外: {} | {}".format(
+                    error_info["check"],
+                    error_info["message"]
+                )
+            )
+
+        output_text = "\n".join(lines)
+
+        result_view.setPlainText(output_text)
+
+        print(output_text)
+
+        return
+
+    # =====================================
+    # 05. FBX書き出し
+    # =====================================
+
+    try:
+
+        importlib.reload(export_fbx)
+
+        export_result = export_fbx.export_selected_fbx()
+
+    except Exception as error:
+
+        message = (
+            "FBX書き出し中にエラーが発生しました: {}".format(
+                error
+            )
+        )
+
+        result_view.setPlainText(message)
+
+        print(message)
+
+        return
+
+    if not isinstance(export_result, dict):
+
+        result_view.setPlainText(
+            "FBX書き出し結果の形式が正しくありません。\n"
+            "UEへの送信を中止しました。"
+        )
+
+        return
+
+    export_status = export_result.get("status")
+
+    if export_status == "CANCELLED":
+
+        result_view.setPlainText(
+            "検証はすべてOKです。\n"
+            "FBX書き出しがキャンセルされたため、"
+            "UEへの送信を中止しました。"
+        )
+
+        return
+
+    if export_status != "OK":
+
+        result_view.setPlainText(
+            "FBX書き出しに失敗しました。\n\n"
+            + export_result.get("message", "詳細不明")
+        )
+
+        return
+
+    fbx_path = export_result.get("file_path")
+
+    if not fbx_path or not os.path.isfile(fbx_path):
+
+        result_view.setPlainText(
+            "FBXの書き出し結果を確認できませんでした。\n"
+            "ファイルが存在しないため、UEへの送信を中止しました。\n\n"
+            "取得したパス: {}".format(fbx_path)
+        )
+
+        return
+
+    # =====================================
+    # 06. UE連携モジュール読み込み
+    # =====================================
+
+    try:
+
+        import send_fbx_to_ue
+
+        importlib.reload(send_fbx_to_ue)
+
+    except Exception as error:
+
+        message = (
+            "UE連携モジュールの読み込みに失敗しました。\n\n"
+            + str(error)
+        )
+
+        result_view.setPlainText(message)
+
+        print(message)
+
+        return
+
+    # =====================================
+    # 07. UEへFBXを送信
+    # =====================================
+
+    lines = []
+
+    lines.append("===== UEへのアセット送信 =====")
+
+    lines.append("検証: 全項目OK")
+
+    lines.append(
+        "FBX書き出し: 成功"
+    )
+
+    lines.append(
+        "FBX保存先: {}".format(fbx_path)
+    )
+
+    lines.append(
+        "UE保存先: {}".format(destination_path)
+    )
+
+    lines.append("")
+
+    lines.append("Unreal Engineに接続しています...")
+
+    result_view.setPlainText(
+        "\n".join(lines)
+    )
+
+    print("\n".join(lines))
+
+    try:
+
+        import_result = send_fbx_to_ue.import_fbx_to_ue(
+            fbx_path=fbx_path,
+            destination_path=destination_path
+        )
+
+    except Exception as error:
+
+        message = (
+            "UEへのFBX送信中にエラーが発生しました。\n\n"
+            + str(error)
+        )
+
+        result_view.setPlainText(message)
+
+        print(message)
+
+        return
+
+    # =====================================
+    # 08. UEインポート結果
+    # =====================================
+
+    lines.append("")
+
+    if import_result.get("status") == "OK":
+
+        lines.append("===== 処理完了 =====")
+
+        lines.append("検証: 成功")
+
+        lines.append("FBX書き出し: 成功")
+
+        lines.append("UEインポート: 成功")
+
+        lines.append("")
+
+        lines.append("===== インポートしたアセット =====")
+
+        for asset_path in import_result.get(
+            "imported_assets",
+            []
+        ):
+
+            lines.append(
+                "- {}".format(asset_path)
+            )
+
+    else:
+
+        lines.append("===== UEインポート失敗 =====")
+
+        lines.append(
+            import_result.get(
+                "message",
+                "エラー詳細不明"
+            )
+        )
+
+        lines.append(
+            "詳細: {}".format(
+                import_result.get("details", "")
+            )
+        )
+
+        lines.append("")
+        lines.append(
+            "FBXファイルは書き出されています。"
+        )
+
+        lines.append(
+            "FBX保存先: {}".format(fbx_path)
+        )
+
+    # =====================================
+    # 09. 最終結果表示
+    # =====================================
+
+    output_text = "\n".join(lines)
+
+    result_view.setPlainText(output_text)
+
+    print(output_text)
+
+# =========================================
+#  UI作成
 # =========================================
 
 def show_ui():
@@ -1474,7 +1829,7 @@ def show_ui():
     main_layout.addWidget(validation_group)
 
     # =====================================
-    # 02. 自動修正機能
+    #  自動修正機能
     # =====================================
 
     auto_fix_group = QtWidgets.QGroupBox(
@@ -1493,7 +1848,7 @@ def show_ui():
 
     # Transform自動修正
     transform_fix_button = QtWidgets.QPushButton(
-        "Transform自動修正・再検証"
+        "Transformのフリーズをして再検証"
     )
 
     transform_fix_button.setObjectName(
@@ -1511,7 +1866,7 @@ def show_ui():
 
     # Construction History自動修正
     history_fix_button = QtWidgets.QPushButton(
-        "Construction History削除・再検証"
+        "Construction Historyを削除して再検証"
     )
 
     history_fix_button.setObjectName(
@@ -1529,7 +1884,7 @@ def show_ui():
 
     # 命名規則自動修正
     name_fix_button = QtWidgets.QPushButton(
-        "命名規則自動修正・再検証"
+        "命名規則を自動修正して再検証"
     )
 
     name_fix_button.setObjectName(
@@ -1563,11 +1918,11 @@ def show_ui():
     main_layout.addWidget(auto_fix_group)
 
     # =====================================
-    # 03. FBX書き出し
+    # FBX書き出し・UE連携
     # =====================================
 
     export_group = QtWidgets.QGroupBox(
-        "03 / FBX書き出し"
+        "03 / FBX書き出し・UE連携"
     )
 
     export_layout = QtWidgets.QVBoxLayout(
@@ -1577,6 +1932,52 @@ def show_ui():
     export_layout.setContentsMargins(
         14, 24, 14, 14
     )
+
+    export_layout.setSpacing(10)
+
+    # =====================================
+    # UE保存先
+    # =====================================
+
+    destination_layout = QtWidgets.QHBoxLayout()
+
+    destination_label = QtWidgets.QLabel(
+        "UE保存先"
+    )
+
+    destination_label.setObjectName(
+        "ueDestinationLabel"
+    )
+
+    ue_destination_input = QtWidgets.QLineEdit(
+        "/Game/MayaImports"
+    )
+
+    ue_destination_input.setObjectName(
+        "ueDestinationInput"
+    )
+
+    ue_destination_input.setPlaceholderText(
+        "例：/Game/Environment/Rocks"
+    )
+
+    destination_layout.addWidget(
+        destination_label
+    )
+
+    destination_layout.addWidget(
+        ue_destination_input,
+        1
+    )
+
+    export_layout.addLayout(
+        destination_layout
+    )
+
+
+    # =====================================
+    # 通常のFBX書き出し
+    # =====================================
 
     export_button = QtWidgets.QPushButton(
         "検証してFBX書き出し"
@@ -1594,9 +1995,40 @@ def show_ui():
             )
     )
 
-    export_layout.addWidget(export_button)
+    export_layout.addWidget(
+        export_button
+    )
 
-    main_layout.addWidget(export_group)
+
+    # =====================================
+    # UEへ送信
+    # =====================================
+
+    export_to_ue_button = QtWidgets.QPushButton(
+        "検証してUEへ送信"
+    )
+
+    export_to_ue_button.setObjectName(
+        "sendToUEButton"
+    )
+
+    export_to_ue_button.clicked.connect(
+        lambda checked=False:
+            run_validate_export_and_import(
+                result_view,
+                validation_checks,
+                ue_destination_input
+            )
+    )
+
+    export_layout.addWidget(
+        export_to_ue_button
+    )
+
+
+    main_layout.addWidget(
+        export_group
+    )
 
     # =====================================
     # 04. 検証結果表示
@@ -1751,6 +2183,28 @@ def show_ui():
             padding: 10px;
         }
 
-    """)
+
+        QLineEdit#ueDestinationInput:focus {
+        border: 1px solid #68C8DC;
+        }
+
+    QPushButton#sendToUEButton {
+        background-color: #574C78;
+        color: #FFFFFF;
+        font-size: 14px;
+        font-weight: bold;
+        padding: 15px;
+        border: none;
+        border-radius: 6px;
+    }
+
+    QPushButton#sendToUEButton:hover {
+        background-color: #70619A;
+    }
+
+    QPushButton#sendToUEButton:pressed {
+        background-color: #44395F;
+    }
+        """)
 
     WINDOW.show()
