@@ -1,12 +1,57 @@
 import os
 import sys
 import importlib
+import traceback
 
 import maya.cmds as cmds
 
-from PySide6 import QtCore, QtWidgets
+# =========================================
+# 00. Qtライブラリ読み込み
+# =========================================
+
+try:
+
+    # Maya 2025以降
+    from PySide6 import QtCore, QtWidgets
+
+    from shiboken6 import wrapInstance
+
+    QT_BINDING = "PySide6"
+
+    QMessageBoxIcon = QtWidgets.QMessageBox.Icon
+
+    QMessageBoxStandardButton = (
+        QtWidgets.QMessageBox.StandardButton
+    )
+
+    WINDOW_FLAG = QtCore.Qt.WindowType.Window
+
+except ImportError:
+
+    try:
+
+        # Maya 2024以前
+        from PySide2 import QtCore, QtWidgets
+
+        from shiboken2 import wrapInstance
+
+        QT_BINDING = "PySide2"
+
+        QMessageBoxIcon = QtWidgets.QMessageBox
+
+        QMessageBoxStandardButton = QtWidgets.QMessageBox
+
+        WINDOW_FLAG = QtCore.Qt.Window
+
+    except ImportError as error:
+
+        raise ImportError(
+            "PySide2またはPySide6を読み込めません。\n"
+            "Maya付属のPython環境で実行してください。"
+        ) from error
+
+
 from maya import OpenMayaUI as omui
-from shiboken6 import wrapInstance
 
 
 # =========================================
@@ -14,17 +59,23 @@ from shiboken6 import wrapInstance
 # =========================================
 
 SCRIPT_DIR = os.path.dirname(
-    os.path.abspath(__file__))
+    os.path.abspath(__file__)
+)
 
-UE_EXPORT_TOOLKIT_DIR = os.path.join(
-    SCRIPT_DIR, 
-    "ue")
+UE_SCRIPT_DIR = os.path.join(
+    SCRIPT_DIR,
+    "ue"
+)
 
-for directory in [SCRIPT_DIR, UE_EXPORT_TOOLKIT_DIR]:
+for directory in [SCRIPT_DIR, UE_SCRIPT_DIR]:
 
     if directory not in sys.path:
 
-        sys.path.insert(0, directory)
+        sys.path.insert(
+            0,
+            directory
+        )
+
 
 # =========================================
 # 02. モジュール読み込み
@@ -36,9 +87,9 @@ import validate_history
 import validate_ngons
 import validate_uvs
 
+import fix_names
 import fix_transforms
 import fix_history
-import fix_names
 
 import export_fbx
 
@@ -48,14 +99,26 @@ import export_fbx
 # =========================================
 
 WINDOW = None
+
 WINDOW_NAME = "ExportToolkitTestWindow"
+
+
+print(
+    "Export Toolkit Qt Binding: {}".format(
+        QT_BINDING
+    )
+)
 
 
 # =========================================
 # 04. 個別検証
 # =========================================
 
-def run_validation(result_view, check_function, check_title):
+def run_validation(
+    result_view,
+    check_function,
+    check_title
+):
 
     try:
 
@@ -73,7 +136,9 @@ def run_validation(result_view, check_function, check_title):
         lines = []
 
         lines.append(
-            "===== {}チェック結果 =====".format(check_title)
+            "===== {}チェック結果 =====".format(
+                check_title
+            )
         )
 
         lines.append("")
@@ -111,18 +176,25 @@ def run_validation(result_view, check_function, check_title):
                         for key, value in detail.items():
 
                             lines.append(
-                                " {}: {}".format(key, value)
+                                " {}: {}".format(
+                                    key,
+                                    value
+                                )
                             )
 
                     else:
 
-                        lines.append(" " + str(detail))
+                        lines.append(
+                            " " + str(detail)
+                        )
 
             lines.append("")
 
         output_text = "\n".join(lines)
 
-        result_view.setPlainText(output_text)
+        result_view.setPlainText(
+            output_text
+        )
 
         print(output_text)
 
@@ -143,7 +215,11 @@ def run_validation(result_view, check_function, check_title):
 # 05. 全項目チェック
 # =========================================
 
-def run_all_validations(result_view, validation_checks, display=True):
+def run_all_validations(
+    result_view,
+    validation_checks,
+    display=True
+):
 
     selected = cmds.ls(
         selection=True,
@@ -165,9 +241,13 @@ def run_all_validations(result_view, validation_checks, display=True):
         }
 
     all_results = []
+
     errors = []
 
+    # -------------------------------------
     # 5種類の検証を実行
+    # -------------------------------------
+
     for label, check_function in validation_checks:
 
         try:
@@ -179,17 +259,31 @@ def run_all_validations(result_view, validation_checks, display=True):
         except Exception as caught_exception:
 
             errors.append({
+
                 "check": label,
-                "type": type(caught_exception).__name__,
-                "message": str(caught_exception)
+
+                "type": type(
+                    caught_exception
+                ).__name__,
+
+                "message": str(
+                    caught_exception
+                )
+
             })
 
+    # -------------------------------------
     # オブジェクト単位で結果を整理
+    # -------------------------------------
+
     object_results = {}
 
     for result in all_results:
 
-        object_name = result.get("object") or "不明"
+        object_name = (
+            result.get("object")
+            or "不明"
+        )
 
         if object_name not in object_results:
 
@@ -199,14 +293,22 @@ def run_all_validations(result_view, validation_checks, display=True):
 
     lines = []
 
-    lines.append("===== 全項目チェック結果 =====")
+    lines.append(
+        "===== 全項目チェック結果 ====="
+    )
+
     lines.append("")
 
+    # -------------------------------------
     # 検証結果を表示
+    # -------------------------------------
+
     for object_name, results in object_results.items():
 
         lines.append(
-            "オブジェクト: {}".format(object_name)
+            "オブジェクト: {}".format(
+                object_name
+            )
         )
 
         lines.append("")
@@ -239,7 +341,10 @@ def run_all_validations(result_view, validation_checks, display=True):
                         for key, value in detail.items():
 
                             lines.append(
-                                "  {}: {}".format(key, value)
+                                "  {}: {}".format(
+                                    key,
+                                    value
+                                )
                             )
 
                     else:
@@ -250,66 +355,125 @@ def run_all_validations(result_view, validation_checks, display=True):
 
             lines.append("")
 
+    # -------------------------------------
     # ステータス集計
+    # -------------------------------------
+
     ok_count = sum(
-        1 for result in all_results
+        1
+        for result in all_results
         if result.get("status") == "OK"
     )
 
     ng_count = sum(
-        1 for result in all_results
+        1
+        for result in all_results
         if result.get("status") == "NG"
     )
 
     skip_count = sum(
-        1 for result in all_results
+        1
+        for result in all_results
         if result.get("status") == "SKIP"
     )
 
+    warning_count = sum(
+        1
+        for result in all_results
+        if result.get("status") == "WARNING"
+    )
+
     result_error_count = sum(
-        1 for result in all_results
+        1
+        for result in all_results
         if result.get("status") == "ERROR"
     )
 
     exception_count = len(errors)
 
-    error_count = result_error_count + exception_count
+    error_count = (
+        result_error_count
+        + exception_count
+    )
 
+    # -------------------------------------
     # 実行サマリー
-    lines.append("===== 実行サマリー =====")
+    # -------------------------------------
 
     lines.append(
-        "検証対象オブジェクト数: {}".format(len(selected))
+        "===== 実行サマリー ====="
     )
 
     lines.append(
-        "取得した検証結果数: {}".format(len(all_results))
+        "検証対象オブジェクト数: {}".format(
+            len(selected)
+        )
     )
 
-    lines.append("OK件数: {}".format(ok_count))
-    lines.append("NG件数: {}".format(ng_count))
-    lines.append("SKIP件数: {}".format(skip_count))
-    lines.append("ERROR件数: {}".format(error_count))
-    lines.append("例外が発生した数: {}".format(exception_count))
+    lines.append(
+        "取得した検証結果数: {}".format(
+            len(all_results)
+        )
+    )
 
+    lines.append(
+        "OK件数: {}".format(ok_count)
+    )
+
+    lines.append(
+        "WARNING件数: {}".format(
+            warning_count
+        )
+    )
+
+    lines.append(
+        "NG件数: {}".format(ng_count)
+    )
+
+    lines.append(
+        "SKIP件数: {}".format(skip_count)
+    )
+
+    lines.append(
+        "ERROR件数: {}".format(error_count)
+    )
+
+    lines.append(
+        "例外が発生した数: {}".format(
+            exception_count
+        )
+    )
+
+    # -------------------------------------
     # エラー詳細
+    # -------------------------------------
+
     if errors:
 
         lines.append("")
-        lines.append("===== エラー詳細 =====")
+
+        lines.append(
+            "===== エラー詳細 ====="
+        )
 
         for error_info in errors:
 
             lines.append(
-                "検証項目: {}".format(error_info["check"])
+                "検証項目: {}".format(
+                    error_info["check"]
+                )
             )
 
             lines.append(
-                "エラーの種類: {}".format(error_info["type"])
+                "エラーの種類: {}".format(
+                    error_info["type"]
+                )
             )
 
             lines.append(
-                "エラーの詳細: {}".format(error_info["message"])
+                "エラーの詳細: {}".format(
+                    error_info["message"]
+                )
             )
 
             lines.append("")
@@ -318,26 +482,223 @@ def run_all_validations(result_view, validation_checks, display=True):
 
     if display:
 
-        result_view.setPlainText(output_text)
+        result_view.setPlainText(
+            output_text
+        )
 
         print(output_text)
 
     return {
+
         "results": all_results,
+
         "errors": errors
+
     }
 
 
 # =========================================
-# 06. 確認ダイアログ
+# 06. 書き出し前の検証判定
 # =========================================
 
-def ask_confirmation(parent, title, message):
+def check_export_validation(
+    result_view,
+    validation_checks,
+    export_mode
+):
+
+    # -------------------------------------
+    # クイックモード
+    # -------------------------------------
+
+    if export_mode == "quick":
+
+        message = (
+            "===== クイックモード =====\n\n"
+            "アセット検証を省略します。\n"
+            "検証を行わず、FBX書き出しへ進みます。\n\n"
+            "※命名規則・Transform・History・N-gon・UVの\n"
+            "検証は実行されていません。"
+        )
+
+        result_view.setPlainText(message)
+
+        print(message)
+
+        return True
+
+    # -------------------------------------
+    # モードの確認
+    # -------------------------------------
+
+    if export_mode != "strict":
+
+        result_view.setPlainText(
+            "書き出しモードが不正です。\n"
+            "処理を中止しました。"
+        )
+
+        return False
+
+    # -------------------------------------
+    # 厳格チェック
+    # -------------------------------------
+
+    validation_data = run_all_validations(
+        result_view,
+        validation_checks,
+        display=True
+    )
+
+    results = validation_data["results"]
+
+    errors = validation_data["errors"]
+
+    # -------------------------------------
+    # 検証結果がない場合
+    # -------------------------------------
+
+    if not results:
+
+        lines = [
+
+            result_view.toPlainText(),
+
+            "",
+
+            "===== 書き出し判定 =====",
+
+            "検証結果を取得できませんでした。",
+
+            "FBX書き出しを中止しました。"
+
+        ]
+
+        result_view.setPlainText(
+            "\n".join(lines)
+        )
+
+        return False
+
+    # -------------------------------------
+    # OK以外の結果を抽出
+    # -------------------------------------
+
+    failed_results = [
+
+        result
+
+        for result in results
+
+        if result.get("status") != "OK"
+
+    ]
+
+    # -------------------------------------
+    # 書き出し可否の判定
+    # -------------------------------------
+
+    if failed_results or errors:
+
+        lines = [
+
+            result_view.toPlainText(),
+
+            "",
+
+            "===== 厳格チェック判定 =====",
+
+            "検証に問題があるため、書き出しを中止しました。",
+
+            ""
+
+        ]
+
+        for result in failed_results:
+
+            lines.append(
+                "対象: {}".format(
+                    result.get("object", "不明")
+                )
+            )
+
+            lines.append(
+                "検証: {}".format(
+                    result.get("check", "不明")
+                )
+            )
+
+            lines.append(
+                "状態: {}".format(
+                    result.get("status", "不明")
+                )
+            )
+
+            lines.append(
+                "内容: {}".format(
+                    result.get("message", "")
+                )
+            )
+
+            lines.append("")
+
+        if errors:
+
+            lines.append(
+                "===== 検証例外 ====="
+            )
+
+            for error_info in errors:
+
+                lines.append(
+                    "検証項目: {}".format(
+                        error_info["check"]
+                    )
+                )
+
+                lines.append(
+                    "エラー: {}".format(
+                        error_info["message"]
+                    )
+                )
+
+                lines.append("")
+
+        output_text = "\n".join(lines)
+
+        result_view.setPlainText(
+            output_text
+        )
+
+        print(output_text)
+
+        return False
+
+    # -------------------------------------
+    # 全項目合格
+    # -------------------------------------
+
+    print(
+        "厳格チェックに合格しました。"
+    )
+
+    return True
+
+
+# =========================================
+# 07. 確認ダイアログ
+# =========================================
+
+def ask_confirmation(
+    parent,
+    title,
+    message
+):
 
     dialog = QtWidgets.QMessageBox(parent)
 
     dialog.setIcon(
-        QtWidgets.QMessageBox.Icon.Warning
+        QMessageBoxIcon.Warning
     )
 
     dialog.setWindowTitle(title)
@@ -345,39 +706,60 @@ def ask_confirmation(parent, title, message):
     dialog.setText(message)
 
     dialog.setStandardButtons(
-        QtWidgets.QMessageBox.StandardButton.Yes
-        | QtWidgets.QMessageBox.StandardButton.No
+
+        QMessageBoxStandardButton.Yes
+        |
+        QMessageBoxStandardButton.No
+
     )
 
     dialog.button(
-        QtWidgets.QMessageBox.StandardButton.Yes
+        QMessageBoxStandardButton.Yes
     ).setText("実行する")
 
     dialog.button(
-        QtWidgets.QMessageBox.StandardButton.No
+        QMessageBoxStandardButton.No
     ).setText("キャンセル")
 
     dialog.setDefaultButton(
-        QtWidgets.QMessageBox.StandardButton.No
+        QMessageBoxStandardButton.No
     )
 
-    answer = dialog.exec()
+    exec_function = getattr(
+        dialog,
+        "exec",
+        None
+    )
+
+    if exec_function is not None:
+
+        answer = exec_function()
+
+    else:
+
+        answer = dialog.exec_()
 
     return (
         answer
-        == QtWidgets.QMessageBox.StandardButton.Yes
+        == QMessageBoxStandardButton.Yes
     )
 
 
 # =========================================
-# 07. 自動修正結果の表示
+# 08. 自動修正結果の表示
 # =========================================
 
-def append_fix_results(lines, fix_results):
+def append_fix_results(
+    lines,
+    fix_results
+):
 
     for result in fix_results:
 
-        object_name = result.get("object", "不明")
+        object_name = result.get(
+            "object",
+            "不明"
+        )
 
         if isinstance(object_name, str):
 
@@ -399,7 +781,10 @@ def append_fix_results(lines, fix_results):
             )
         )
 
-        details = result.get("details", [])
+        details = result.get(
+            "details",
+            []
+        )
 
         if details:
 
@@ -412,18 +797,23 @@ def append_fix_results(lines, fix_results):
                     for key, value in detail.items():
 
                         lines.append(
-                            " {}: {}".format(key, value)
+                            " {}: {}".format(
+                                key,
+                                value
+                            )
                         )
 
                 else:
 
-                    lines.append(" " + str(detail))
+                    lines.append(
+                        " " + str(detail)
+                    )
 
         lines.append("")
 
 
 # =========================================
-# 08. 修正後の再検証
+# 09. 修正後の再検証
 # =========================================
 
 def finish_fix_and_revalidate(
@@ -437,12 +827,16 @@ def finish_fix_and_revalidate(
     lines = []
 
     lines.append(
-        "===== {}の結果 =====".format(operation_title)
+        "===== {}の結果 =====".format(
+            operation_title
+        )
     )
 
     if not fix_results:
 
-        lines.append("修正結果がありません。")
+        lines.append(
+            "修正結果がありません。"
+        )
 
         result_view.setPlainText(
             "\n".join(lines)
@@ -450,16 +844,23 @@ def finish_fix_and_revalidate(
 
         return
 
-    append_fix_results(lines, fix_results)
+    append_fix_results(
+        lines,
+        fix_results
+    )
 
-    # =====================================
+    # -------------------------------------
     # ERRORを抽出
-    # =====================================
+    # -------------------------------------
 
     fix_errors = [
+
         result
+
         for result in fix_results
+
         if result.get("status") == "ERROR"
+
     ]
 
     if fix_errors:
@@ -474,20 +875,27 @@ def finish_fix_and_revalidate(
 
         return
 
-    # =====================================
+    # -------------------------------------
     # 修正に成功したオブジェクトを取得
-    # =====================================
+    # -------------------------------------
 
     fix_successes = [
+
         result
+
         for result in fix_results
+
         if result.get("status") == "OK"
         and result.get("object")
+
     ]
 
     successful_objects = [
+
         result.get("object")
+
         for result in fix_successes
+
     ]
 
     if not successful_objects:
@@ -502,36 +910,46 @@ def finish_fix_and_revalidate(
 
         return
 
-    # =====================================
+    # -------------------------------------
     # 修正前・修正後のパスを対応付ける
-    # =====================================
+    # -------------------------------------
 
     selection_mapping = {}
 
     for result in fix_results:
 
-        details = result.get("details", [])
+        details = result.get(
+            "details",
+            []
+        )
 
         for detail in details:
 
             if isinstance(detail, dict):
 
-                old_path = detail.get("変更前パス")
-                new_path = detail.get("変更後パス")
+                old_path = detail.get(
+                    "変更前パス"
+                )
+
+                new_path = detail.get(
+                    "変更後パス"
+                )
 
                 if old_path and new_path:
 
                     selection_mapping[old_path] = new_path
 
-    # 修正前のパスを修正後のパスに置き換える
     selection_to_restore = [
+
         selection_mapping.get(obj, obj)
+
         for obj in selected
+
     ]
 
-    # =====================================
+    # -------------------------------------
     # 修正後の再検証
-    # =====================================
+    # -------------------------------------
 
     validation_data = None
 
@@ -553,22 +971,26 @@ def finish_fix_and_revalidate(
     except Exception as error:
 
         lines.append("")
+
         lines.append(
-            "再検証中にエラーが発生しました: {}".format(error)
+            "再検証中にエラーが発生しました: {}".format(
+                error
+            )
         )
 
     finally:
 
-        # =================================
         # 元の選択状態を復元
-        # =================================
-
         try:
 
             valid_selection = [
+
                 obj
+
                 for obj in selection_to_restore
+
                 if cmds.objExists(obj)
+
             ]
 
             if valid_selection:
@@ -586,9 +1008,9 @@ def finish_fix_and_revalidate(
 
             selection_restore_error = str(error)
 
-    # =====================================
+    # -------------------------------------
     # 再検証結果が取得できなかった場合
-    # =====================================
+    # -------------------------------------
 
     if validation_data is None:
 
@@ -608,22 +1030,29 @@ def finish_fix_and_revalidate(
 
         return
 
-    # =====================================
-    # 再検証結果の取得
-    # =====================================
+    # -------------------------------------
+    # 再検証結果を取得
+    # -------------------------------------
 
     validation_results = validation_data["results"]
 
     validation_errors = validation_data["errors"]
 
     failed_results = [
+
         result
+
         for result in validation_results
+
         if result.get("status") != "OK"
+
     ]
 
     lines.append("")
-    lines.append("===== 修正後の再検証結果 =====")
+
+    lines.append(
+        "===== 修正後の再検証結果 ====="
+    )
 
     lines.append(
         "検証件数: {}".format(
@@ -637,13 +1066,16 @@ def finish_fix_and_revalidate(
         )
     )
 
-    # =====================================
+    # -------------------------------------
     # 個別の検証結果
-    # =====================================
+    # -------------------------------------
 
     for result in validation_results:
 
-        object_name = result.get("object", "不明")
+        object_name = result.get(
+            "object",
+            "不明"
+        )
 
         if isinstance(object_name, str):
 
@@ -658,14 +1090,17 @@ def finish_fix_and_revalidate(
             )
         )
 
-    # =====================================
-    # 再検証エラーの表示
-    # =====================================
+    # -------------------------------------
+    # 再検証エラー
+    # -------------------------------------
 
     if validation_errors:
 
         lines.append("")
-        lines.append("===== 再検証エラー =====")
+
+        lines.append(
+            "===== 再検証エラー ====="
+        )
 
         for error_info in validation_errors:
 
@@ -687,31 +1122,35 @@ def finish_fix_and_revalidate(
                 )
             )
 
-    # =====================================
+    # -------------------------------------
     # 選択状態の復元エラー
-    # =====================================
+    # -------------------------------------
 
     if selection_restore_error:
 
         lines.append("")
+
         lines.append(
             "選択状態の復元エラー: {}".format(
                 selection_restore_error
             )
         )
 
-    # =====================================
+    # -------------------------------------
     # 最終結果表示
-    # =====================================
+    # -------------------------------------
 
     output_text = "\n".join(lines)
 
-    result_view.setPlainText(output_text)
+    result_view.setPlainText(
+        output_text
+    )
 
     print(output_text)
 
+
 # =========================================
-# 09. 命名規則自動修正
+# 10. 命名規則自動修正
 # =========================================
 
 def run_name_auto_fix(
@@ -736,6 +1175,7 @@ def run_name_auto_fix(
         return
 
     fix_candidates = []
+
     skipped_objects = []
 
     for obj in selected:
@@ -750,20 +1190,28 @@ def run_name_auto_fix(
         ) or []
 
         mesh_shapes = [
+
             shape
+
             for shape in shapes
+
             if cmds.nodeType(shape) == "mesh"
+
         ]
 
         if not mesh_shapes:
 
-            skipped_objects.append(object_name)
+            skipped_objects.append(
+                object_name
+            )
 
             continue
 
         if not object_name.startswith("SM_"):
 
-            fix_candidates.append(object_name)
+            fix_candidates.append(
+                object_name
+            )
 
     if not fix_candidates:
 
@@ -775,23 +1223,37 @@ def run_name_auto_fix(
         return
 
     fix_list = "\n".join(
+
         "- " + name
+
         for name in fix_candidates
+
     )
 
     skipped_list = "\n".join(
+
         "- " + name
+
         for name in skipped_objects
+
     ) if skipped_objects else "なし"
 
     message = (
+
         "命名規則の自動修正対象を確認してください。\n\n"
+
         "【修正対象】\n"
+
         + fix_list
+
         + "\n\n【スキップ対象】\n"
+
         + skipped_list
+
         + "\n\n対象のオブジェクト名の先頭にSM_を追加します。\n\n"
+
         "続行しますか？"
+
     )
 
     confirmed = ask_confirmation(
@@ -835,9 +1297,8 @@ def run_name_auto_fix(
         print(message)
 
 
-
 # =========================================
-# 09. Transform自動修正
+# 11. Transform自動修正
 # =========================================
 
 def run_transform_auto_fix(
@@ -862,6 +1323,7 @@ def run_transform_auto_fix(
         return
 
     fix_candidates = []
+
     skipped_objects = []
 
     for obj in selected:
@@ -874,9 +1336,13 @@ def run_transform_auto_fix(
         ) or []
 
         mesh_shapes = [
+
             shape
+
             for shape in shapes
+
             if cmds.nodeType(shape) == "mesh"
+
         ]
 
         object_name = obj.split("|")[-1]
@@ -892,12 +1358,17 @@ def run_transform_auto_fix(
     if not fix_candidates:
 
         lines = [
+
             "Transform自動修正の対象となるメッシュがありません。",
+
             "",
+
             "スキップ対象:"
+
         ]
 
         for name in skipped_objects:
+
             lines.append("- " + name)
 
         result_view.setPlainText(
@@ -907,24 +1378,39 @@ def run_transform_auto_fix(
         return
 
     fix_list = "\n".join(
+
         "- " + name
+
         for name in fix_candidates
+
     )
 
     skipped_list = "\n".join(
+
         "- " + name
+
         for name in skipped_objects
+
     ) if skipped_objects else "なし"
 
     message = (
+
         "Transform自動修正の対象を確認してください。\n\n"
+
         "【修正対象（メッシュ）】\n"
+
         + fix_list
+
         + "\n\n【スキップ対象（メッシュShapeなし）】\n"
+
         + skipped_list
+
         + "\n\nTranslate・Rotate・Scaleを基準値に戻します。\n"
+
         "ワールド境界を確認しながら処理します。\n\n"
+
         "続行しますか？"
+
     )
 
     confirmed = ask_confirmation(
@@ -969,7 +1455,7 @@ def run_transform_auto_fix(
 
 
 # =========================================
-# 10. Construction History自動修正
+# 12. Construction History自動修正
 # =========================================
 
 def run_history_auto_fix(
@@ -996,6 +1482,7 @@ def run_history_auto_fix(
         return
 
     history_candidates = []
+
     skipped_objects = []
 
     for obj in selected:
@@ -1008,9 +1495,13 @@ def run_history_auto_fix(
         ) or []
 
         mesh_shapes = [
+
             shape
+
             for shape in shapes
+
             if cmds.nodeType(shape) == "mesh"
+
         ]
 
         object_name = obj.split("|")[-1]
@@ -1018,7 +1509,10 @@ def run_history_auto_fix(
         if not mesh_shapes:
 
             skipped_objects.append(
-                (object_name, "メッシュShapeがありません")
+                (
+                    object_name,
+                    "メッシュShapeがありません"
+                )
             )
 
             continue
@@ -1031,30 +1525,43 @@ def run_history_auto_fix(
         if not history:
 
             skipped_objects.append(
-                (object_name, "Construction Historyがありません")
+                (
+                    object_name,
+                    "Construction Historyがありません"
+                )
             )
 
             continue
 
         history_types = {
+
             node: cmds.nodeType(node)
+
             for node in history
+
         }
 
         unsupported_nodes = [
+
             node
+
             for node, node_type in history_types.items()
+
             if node_type not in fix_history.ALLOWED_HISTORY_TYPES
+
         ]
 
         if unsupported_nodes:
 
             node_details = ", ".join(
+
                 "{} ({})".format(
                     node,
                     history_types[node]
                 )
+
                 for node in unsupported_nodes
+
             )
 
             skipped_objects.append(
@@ -1066,20 +1573,29 @@ def run_history_auto_fix(
 
         else:
 
-            history_candidates.append(object_name)
+            history_candidates.append(
+                object_name
+            )
 
     if not history_candidates:
 
         lines = [
+
             "Construction Historyの削除対象がありません。",
+
             "",
+
             "スキップ対象:"
+
         ]
 
         for name, reason in skipped_objects:
 
             lines.append(
-                "- {}：{}".format(name, reason)
+                "- {}：{}".format(
+                    name,
+                    reason
+                )
             )
 
         result_view.setPlainText(
@@ -1089,24 +1605,42 @@ def run_history_auto_fix(
         return
 
     history_list = "\n".join(
+
         "- " + name
+
         for name in history_candidates
+
     )
 
     skipped_list = "\n".join(
-        "- {}：{}".format(name, reason)
+
+        "- {}：{}".format(
+            name,
+            reason
+        )
+
         for name, reason in skipped_objects
+
     ) if skipped_objects else "なし"
 
     message = (
+
         "Construction Historyの処理対象を確認してください。\n\n"
+
         "【削除対象】\n"
+
         + history_list
+
         + "\n\n【スキップ対象】\n"
+
         + skipped_list
+
         + "\n\n削除対象のメッシュからConstruction Historyを削除します。\n"
+
         "削除後はモデリング操作の履歴を編集できなくなります。\n\n"
+
         "続行しますか？"
+
     )
 
     confirmed = ask_confirmation(
@@ -1149,14 +1683,18 @@ def run_history_auto_fix(
 
 
 # =========================================
-# 11. FBX書き出し
+# 13. FBX書き出し
 # =========================================
 
 def run_validate_and_export(
     result_view,
-    validation_checks
+    validation_checks,
+    mode_widget
 ):
-    """全項目を検証し、すべてOKの場合だけFBXを書き出す。"""
+
+    # -------------------------------------
+    # 選択状態の確認
+    # -------------------------------------
 
     selected = cmds.ls(
         selection=True,
@@ -1173,109 +1711,101 @@ def run_validate_and_export(
 
         return
 
-    # まず全項目の検証を実行
-    validation_data = run_all_validations(
-        result_view,
-        validation_checks,
-        display=True
+    # -------------------------------------
+    # 書き出しモード取得
+    # -------------------------------------
+
+    export_mode = mode_widget.currentData()
+
+    mode_name = (
+
+        "厳格チェック"
+
+        if export_mode == "strict"
+
+        else "クイックモード"
+
     )
 
-    results = validation_data["results"]
-    errors = validation_data["errors"]
+    # -------------------------------------
+    # 書き出し前の検証
+    # -------------------------------------
 
-    # 検証結果が取得できなかった場合
-    if not results:
+    can_export = check_export_validation(
+        result_view,
+        validation_checks,
+        export_mode
+    )
 
-        result_view.setPlainText(
-            "検証結果がありません。\n"
-            "FBX書き出しを中止しました。"
-        )
-
-        return
-
-    # OK以外の結果を抽出
-    failed_results = [
-        result
-        for result in results
-        if result.get("status") != "OK"
-    ]
-
-    # NG・SKIP・ERROR・例外があれば中止
-    if failed_results or errors:
-
-        lines = [
-            result_view.toPlainText(),
-            "",
-            "===== FBX書き出し判定 =====",
-            "検証に問題があるため、FBX書き出しを中止しました。",
-            ""
-        ]
-
-        for result in failed_results:
-
-            lines.append(
-                "対象: {} | 検証: {} | 状態: {} | 内容: {}".format(
-                    result.get("object", "不明"),
-                    result.get("check", "不明"),
-                    result.get("status", "不明"),
-                    result.get("message", "")
-                )
-            )
-
-        for error_info in errors:
-
-            lines.append(
-                "例外: {} | {}".format(
-                    error_info["check"],
-                    error_info["message"]
-                )
-            )
-
-        output_text = "\n".join(lines)
-
-        result_view.setPlainText(output_text)
-
-        print(output_text)
+    if not can_export:
 
         return
 
-    # すべてOKの場合だけFBX書き出し
+    # -------------------------------------
+    # FBX書き出し
+    # -------------------------------------
+
     try:
 
         importlib.reload(export_fbx)
 
         export_result = export_fbx.export_selected_fbx()
 
+        if not isinstance(export_result, dict):
+
+            result_view.setPlainText(
+                "FBX書き出し結果の形式が正しくありません。"
+            )
+
+            return
+
         status = export_result.get("status")
 
         lines = [
-            "===== FBX書き出し結果 ====="
+
+            "===== FBX書き出し結果 =====",
+
+            "",
+
+            "書き出しモード: {}".format(
+                mode_name
+            )
+
         ]
 
         if status == "OK":
 
-            lines.append("すべての検証に合格しました。")
-            lines.append("FBX書き出しが完了しました。")
+            lines.append(
+                "FBX書き出しが完了しました。"
+            )
 
             lines.append(
                 "保存先: {}".format(
-                    export_result.get("file_path", "不明")
+                    export_result.get(
+                        "file_path",
+                        "不明"
+                    )
                 )
             )
 
         elif status == "CANCELLED":
 
-            lines.append("検証はすべてOKです。")
-            lines.append("FBX書き出しはキャンセルされました。")
+            lines.append(
+                "FBX書き出しはキャンセルされました。"
+            )
 
         else:
 
-            lines.append("検証はすべてOKです。")
-            lines.append("FBX書き出しに失敗しました。")
+            lines.append(
+                "FBX書き出しに失敗しました。"
+            )
 
             lines.append(
                 "エラー: {}".format(
-                    export_result.get("message", "詳細不明")
+                    export_result.get(
+                        "message",
+                        "詳細不明"
+                    )
                 )
             )
 
@@ -1299,23 +1829,23 @@ def run_validate_and_export(
 
         print(message)
 
+        return
+
 
 # =========================================
-# 12. 検証・FBX書き出し・UEインポート
+# 14. 検証・FBX書き出し・UEインポート
 # =========================================
 
 def run_validate_export_and_import(
     result_view,
     validation_checks,
-    destination_input
+    destination_input,
+    mode_widget
 ):
-    """全項目検証後、FBXを書き出してUEへインポートする。"""
 
-    lines = []
-
-    # =====================================
-    # 01. 選択状態の確認
-    # =====================================
+    # -------------------------------------
+    # 選択状態の確認
+    # -------------------------------------
 
     selected = cmds.ls(
         selection=True,
@@ -1332,9 +1862,25 @@ def run_validate_export_and_import(
 
         return
 
-    # =====================================
-    # 02. UE保存先の確認
-    # =====================================
+    # -------------------------------------
+    # 書き出しモード取得
+    # -------------------------------------
+
+    export_mode = mode_widget.currentData()
+
+    mode_name = (
+
+        "厳格チェック"
+
+        if export_mode == "strict"
+
+        else "クイックモード"
+
+    )
+
+    # -------------------------------------
+    # UE保存先確認
+    # -------------------------------------
 
     destination_path = destination_input.text().strip()
 
@@ -1343,109 +1889,28 @@ def run_validate_export_and_import(
         result_view.setPlainText(
             "UEの保存先が正しくありません。\n\n"
             "保存先は /Game/ から始まる必要があります。\n"
-            "例：/Game/MayaImports"
+            "例：/Game/Environment/Rocks"
         )
 
         return
 
-    # =====================================
-    # 03. 全項目検証
-    # =====================================
+    # -------------------------------------
+    # 書き出し前の検証
+    # -------------------------------------
 
-    validation_data = run_all_validations(
+    can_export = check_export_validation(
         result_view,
         validation_checks,
-        display=True
+        export_mode
     )
 
-    results = validation_data["results"]
-
-    errors = validation_data["errors"]
-
-    if not results:
-
-        lines.append("===== UE送信判定 =====")
-        lines.append("検証結果を取得できませんでした。")
-        lines.append("UEへの送信を中止しました。")
-
-        if errors:
-
-            for error_info in errors:
-
-                lines.append(
-                    "{}: {}".format(
-                        error_info["check"],
-                        error_info["message"]
-                    )
-                )
-
-        result_view.setPlainText(
-            "\n".join(lines)
-        )
+    if not can_export:
 
         return
 
-    # =====================================
-    # 04. NG・SKIP・ERRORの確認
-    # =====================================
-
-    failed_results = [
-        result
-        for result in results
-        if result.get("status") != "OK"
-    ]
-
-    if failed_results or errors:
-
-        lines.append(
-            result_view.toPlainText()
-        )
-
-        lines.append("")
-        lines.append("===== UE送信判定 =====")
-
-        lines.append(
-            "検証に問題があるため、UEへの送信を中止しました。"
-        )
-
-        return_text = []
-
-        for result in failed_results:
-
-            object_name = result.get(
-                "object",
-                "不明"
-            )
-
-            lines.append(
-                "対象: {} | 検証: {} | 状態: {} | 内容: {}".format(
-                    object_name,
-                    result.get("check", "不明"),
-                    result.get("status", "不明"),
-                    result.get("message", "")
-                )
-            )
-
-        for error_info in errors:
-
-            lines.append(
-                "検証例外: {} | {}".format(
-                    error_info["check"],
-                    error_info["message"]
-                )
-            )
-
-        output_text = "\n".join(lines)
-
-        result_view.setPlainText(output_text)
-
-        print(output_text)
-
-        return
-
-    # =====================================
-    # 05. FBX書き出し
-    # =====================================
+    # -------------------------------------
+    # FBX書き出し
+    # -------------------------------------
 
     try:
 
@@ -1455,15 +1920,12 @@ def run_validate_export_and_import(
 
     except Exception as error:
 
-        message = (
-            "FBX書き出し中にエラーが発生しました: {}".format(
-                error
-            )
+        result_view.setPlainText(
+            "FBX書き出し中にエラーが発生しました。\n\n"
+            + str(error)
         )
 
-        result_view.setPlainText(message)
-
-        print(message)
+        print(traceback.format_exc())
 
         return
 
@@ -1481,8 +1943,7 @@ def run_validate_export_and_import(
     if export_status == "CANCELLED":
 
         result_view.setPlainText(
-            "検証はすべてOKです。\n"
-            "FBX書き出しがキャンセルされたため、"
+            "FBX書き出しがキャンセルされました。\n"
             "UEへの送信を中止しました。"
         )
 
@@ -1492,26 +1953,35 @@ def run_validate_export_and_import(
 
         result_view.setPlainText(
             "FBX書き出しに失敗しました。\n\n"
-            + export_result.get("message", "詳細不明")
+            + str(
+                export_result.get(
+                    "message",
+                    "詳細不明"
+                )
+            )
         )
 
         return
+
+    # -------------------------------------
+    # FBXパス確認
+    # -------------------------------------
 
     fbx_path = export_result.get("file_path")
 
     if not fbx_path or not os.path.isfile(fbx_path):
 
         result_view.setPlainText(
-            "FBXの書き出し結果を確認できませんでした。\n"
-            "ファイルが存在しないため、UEへの送信を中止しました。\n\n"
+            "FBXファイルが見つかりません。\n"
+            "UEへの送信を中止しました。\n\n"
             "取得したパス: {}".format(fbx_path)
         )
 
         return
 
-    # =====================================
-    # 06. UE連携モジュール読み込み
-    # =====================================
+    # -------------------------------------
+    # UE連携モジュール読み込み
+    # -------------------------------------
 
     try:
 
@@ -1524,39 +1994,45 @@ def run_validate_export_and_import(
         message = (
             "UE連携モジュールの読み込みに失敗しました。\n\n"
             + str(error)
+            + "\n\nFBXは書き出し済みです。\n"
+            "保存先: {}".format(fbx_path)
         )
 
         result_view.setPlainText(message)
 
-        print(message)
+        print(traceback.format_exc())
 
         return
 
-    # =====================================
-    # 07. UEへFBXを送信
-    # =====================================
+    # -------------------------------------
+    # UEへ送信
+    # -------------------------------------
 
-    lines = []
+    lines = [
 
-    lines.append("===== UEへのアセット送信 =====")
+        "===== UEへのアセット送信 =====",
 
-    lines.append("検証: 全項目OK")
+        "",
 
-    lines.append(
-        "FBX書き出し: 成功"
-    )
+        "書き出しモード: {}".format(
+            mode_name
+        ),
 
-    lines.append(
-        "FBX保存先: {}".format(fbx_path)
-    )
+        "FBX書き出し: 成功",
 
-    lines.append(
-        "UE保存先: {}".format(destination_path)
-    )
+        "FBX保存先: {}".format(
+            fbx_path
+        ),
 
-    lines.append("")
+        "UE保存先: {}".format(
+            destination_path
+        ),
 
-    lines.append("Unreal Engineに接続しています...")
+        "",
+
+        "Unreal Engineに接続しています..."
+
+    ]
 
     result_view.setPlainText(
         "\n".join(lines)
@@ -1567,8 +2043,11 @@ def run_validate_export_and_import(
     try:
 
         import_result = send_fbx_to_ue.import_fbx_to_ue(
+
             fbx_path=fbx_path,
+
             destination_path=destination_path
+
         )
 
     except Exception as error:
@@ -1576,33 +2055,47 @@ def run_validate_export_and_import(
         message = (
             "UEへのFBX送信中にエラーが発生しました。\n\n"
             + str(error)
+            + "\n\nFBXは書き出し済みです。\n"
+            "保存先: {}".format(fbx_path)
         )
 
         result_view.setPlainText(message)
 
-        print(message)
+        print(traceback.format_exc())
 
         return
 
-    # =====================================
-    # 08. UEインポート結果
-    # =====================================
+    # -------------------------------------
+    # インポート結果
+    # -------------------------------------
 
     lines.append("")
 
-    if import_result.get("status") == "OK":
+    if (
 
-        lines.append("===== 処理完了 =====")
+        isinstance(import_result, dict)
 
-        lines.append("検証: 成功")
+        and import_result.get("status") == "OK"
 
-        lines.append("FBX書き出し: 成功")
+    ):
 
-        lines.append("UEインポート: 成功")
+        lines.append(
+            "===== 処理完了 ====="
+        )
+
+        lines.append(
+            "FBX書き出し: 成功"
+        )
+
+        lines.append(
+            "UEインポート: 成功"
+        )
 
         lines.append("")
 
-        lines.append("===== インポートしたアセット =====")
+        lines.append(
+            "===== インポートしたアセット ====="
+        )
 
         for asset_path in import_result.get(
             "imported_assets",
@@ -1615,33 +2108,47 @@ def run_validate_export_and_import(
 
     else:
 
-        lines.append("===== UEインポート失敗 =====")
-
         lines.append(
-            import_result.get(
-                "message",
-                "エラー詳細不明"
-            )
+            "===== UEインポート失敗 ====="
         )
 
-        lines.append(
-            "詳細: {}".format(
-                import_result.get("details", "")
+        if isinstance(import_result, dict):
+
+            lines.append(
+                import_result.get(
+                    "message",
+                    "エラー詳細不明"
+                )
             )
-        )
+
+            lines.append(
+                "詳細: {}".format(
+                    import_result.get(
+                        "details",
+                        ""
+                    )
+                )
+            )
+
+        else:
+
+            lines.append(
+                "UE連携モジュールから不正な結果が返されました。"
+            )
 
         lines.append("")
+
         lines.append(
-            "FBXファイルは書き出されています。"
+            "FBXは書き出し済みです。"
         )
 
         lines.append(
-            "FBX保存先: {}".format(fbx_path)
+            "保存先: {}".format(fbx_path)
         )
 
-    # =====================================
-    # 09. 最終結果表示
-    # =====================================
+    # -------------------------------------
+    # 最終結果表示
+    # -------------------------------------
 
     output_text = "\n".join(lines)
 
@@ -1649,23 +2156,36 @@ def run_validate_export_and_import(
 
     print(output_text)
 
+
 # =========================================
-#  UI作成
+# UI作成
 # =========================================
 
 def show_ui():
 
     global WINDOW
 
+    # -------------------------------------
     # Mayaのメインウィンドウ
+    # -------------------------------------
+
     maya_ptr = omui.MQtUtil.mainWindow()
+
+    if not maya_ptr:
+
+        raise RuntimeError(
+            "Mayaのメインウィンドウを取得できません。"
+        )
 
     maya_window = wrapInstance(
         int(maya_ptr),
         QtWidgets.QWidget
     )
 
+    # -------------------------------------
     # 古いウィンドウを削除
+    # -------------------------------------
+
     old_windows = maya_window.findChildren(
         QtWidgets.QWidget,
         WINDOW_NAME
@@ -1674,34 +2194,63 @@ def show_ui():
     for old_window in old_windows:
 
         old_window.close()
+
         old_window.deleteLater()
 
     WINDOW = None
 
-    # 全モジュールを再読み込み
+    # -------------------------------------
+    # モジュール再読み込み
+    # -------------------------------------
+
     importlib.reload(validate_names)
+
     importlib.reload(validate_transforms)
+
     importlib.reload(validate_history)
+
     importlib.reload(validate_ngons)
+
     importlib.reload(validate_uvs)
 
-    importlib.reload(fix_transforms)
-    importlib.reload(fix_history)
     importlib.reload(fix_names)
+
+    importlib.reload(fix_transforms)
+
+    importlib.reload(fix_history)
+
     importlib.reload(export_fbx)
 
+    # -------------------------------------
     # 検証関数一覧
+    # -------------------------------------
+
     validation_checks = [
 
-        ("命名規則", validate_names.validate_selected_names),
+        (
+            "命名規則",
+            validate_names.validate_selected_names
+        ),
 
-        ("Transform", validate_transforms.validate_selected_transforms),
+        (
+            "Transform",
+            validate_transforms.validate_selected_transforms
+        ),
 
-        ("Construction History", validate_history.validate_selected_history),
+        (
+            "Construction History",
+            validate_history.validate_selected_history
+        ),
 
-        ("N-gon", validate_ngons.validate_selected_ngons),
+        (
+            "N-gon",
+            validate_ngons.validate_selected_ngons
+        ),
 
-        ("UV", validate_uvs.validate_selected_uvs)
+        (
+            "UV",
+            validate_uvs.validate_selected_uvs
+        )
 
     ]
 
@@ -1709,28 +2258,52 @@ def show_ui():
     # ウィンドウ
     # =====================================
 
-    WINDOW = QtWidgets.QWidget(maya_window)
+    WINDOW = QtWidgets.QWidget(
+        maya_window
+    )
 
-    WINDOW.setObjectName(WINDOW_NAME)
+    WINDOW.setObjectName(
+        WINDOW_NAME
+    )
 
     WINDOW.setWindowTitle(
-        "Maya → Unreal Export Toolkit"
+        "MayaからUEへ書き出しツール"
     )
 
     WINDOW.setWindowFlags(
-        QtCore.Qt.Window
+        WINDOW_FLAG
     )
 
-    WINDOW.resize(540, 900)
+    WINDOW.resize(
+        1100,
+        760
+    )
+
+    WINDOW.setMinimumSize(
+        900,
+        600
+    )
+
+    WINDOW.setMinimumWidth(500)
+
+    WINDOW.setToolTip(
+        "Mayaのアセット検証・自動修正・FBX書き出し・"
+        "Unreal Engineへのインポートを行うツールです。"
+    )
 
     # =====================================
     # メインレイアウト
     # =====================================
 
-    main_layout = QtWidgets.QVBoxLayout(WINDOW)
+    main_layout = QtWidgets.QVBoxLayout(
+        WINDOW
+    )
 
     main_layout.setContentsMargins(
-        24, 24, 24, 24
+        24,
+        24,
+        24,
+        24
     )
 
     main_layout.setSpacing(16)
@@ -1743,23 +2316,153 @@ def show_ui():
         "MAYA / UNREAL ENGINE"
     )
 
-    eyebrow.setObjectName("eyebrowLabel")
-
-    title = QtWidgets.QLabel(
-        "EXPORT TOOLKIT"
+    eyebrow.setObjectName(
+        "eyebrowLabel"
     )
 
-    title.setObjectName("titleLabel")
+    title = QtWidgets.QLabel(
+        "UEエクスポートMayaツール（バージョン2）"
+    )
+
+    title.setObjectName(
+        "titleLabel"
+    )
 
     description = QtWidgets.QLabel(
         "Asset Validation & Export System"
     )
 
-    description.setObjectName("descriptionLabel")
+    description.setObjectName(
+        "descriptionLabel"
+    )
 
     main_layout.addWidget(eyebrow)
+
     main_layout.addWidget(title)
+
     main_layout.addWidget(description)
+
+    # =====================================
+    # メインコンテンツ：左右分割
+    # =====================================
+
+    # Qt5・Qt6両方に対応した横方向設定
+    try:
+        splitter_orientation = (
+            QtCore.Qt.Orientation.Horizontal
+        )
+
+    except AttributeError:
+        splitter_orientation = QtCore.Qt.Horizontal
+
+    # -------------------------------------
+    #  QSplitter作成
+    # -------------------------------------
+
+    content_splitter = QtWidgets.QSplitter(
+        splitter_orientation
+    )
+
+    content_splitter.setObjectName(
+        "mainContentSplitter"
+    )
+
+    # パネルを0幅まで縮小できないようにする
+    content_splitter.setChildrenCollapsible(
+        False
+    )
+
+    # 左右の境界線
+    content_splitter.setHandleWidth(6)
+
+    # -------------------------------------
+    #  左側：操作パネル
+    # -------------------------------------
+
+    left_scroll = QtWidgets.QScrollArea()
+
+    left_scroll.setObjectName("leftScrollArea")
+
+    left_scroll.setWidgetResizable(True)
+
+    left_scroll.setMinimumWidth(420)
+
+
+    left_scroll.setToolTip(
+        "検証・自動修正・FBX書き出しなどの操作を行います。"
+    )
+
+    left_panel = QtWidgets.QWidget()
+
+    left_panel.setObjectName("leftPanel")
+
+
+    left_layout = QtWidgets.QVBoxLayout(
+        left_panel
+    )
+
+    left_layout.setContentsMargins(
+        4,
+        4,
+        12,
+        4
+    )
+
+    left_layout.setSpacing(16)
+
+    # 操作パネルをスクロール領域に設定
+    left_scroll.setWidget(
+        left_panel
+    )
+
+    # -------------------------------------
+    #  右側：結果表示パネル
+    # -------------------------------------
+
+    right_panel = QtWidgets.QWidget()
+
+    right_panel.setObjectName("rightPanel")
+
+
+    right_layout = QtWidgets.QVBoxLayout(
+        right_panel
+    )
+
+    right_layout.setContentsMargins(
+        12,
+        4,
+        4,
+        4
+    )
+
+    right_layout.setSpacing(10)
+
+    # -------------------------------------
+    #  左右パネルをSplitterに登録
+    # -------------------------------------
+    content_splitter.addWidget(
+        left_scroll
+    )
+
+    content_splitter.addWidget(
+        right_panel
+    )
+
+    # 左右のサイズ比率
+    content_splitter.setStretchFactor(
+        0,
+        1
+    )
+
+    content_splitter.setStretchFactor(
+        1,
+        1
+    )
+
+    # 初期幅：左500px、右600px
+    content_splitter.setSizes(
+        [500,600]
+    )
 
     # =====================================
     # 01. 項目検証機能
@@ -1769,55 +2472,131 @@ def show_ui():
         "01 / 項目検証機能"
     )
 
+    validation_group.setToolTip(
+        "選択したアセットの品質を確認する機能です。\n"
+        "個別チェックまたは全項目一括チェックを実行できます。"
+    )
+
     validation_layout = QtWidgets.QGridLayout(
         validation_group
     )
 
     validation_layout.setContentsMargins(
-        14, 24, 14, 14
+        14,
+        24,
+        14,
+        14
     )
 
     validation_layout.setSpacing(10)
 
+    # -------------------------------------
     # 全項目チェック
+    # -------------------------------------
+
     all_button = QtWidgets.QPushButton(
         "全項目一括チェック"
     )
 
-    all_button.setObjectName("allCheckButton")
+    all_button.setObjectName(
+        "allCheckButton"
+    )
+
+    all_button.setToolTip(
+        "選択したメッシュに対して5種類の検証を一括実行します。\n\n"
+        "命名規則・Transform・Construction History・N-gon・UVを確認します。\n"
+        "検証結果は下の結果表示欄に出力されます。"
+    )
 
     all_button.clicked.connect(
+
         lambda checked=False:
+
             run_all_validations(
                 result_view,
                 validation_checks
             )
+
     )
 
     validation_layout.addWidget(
         all_button,
-        0, 0, 1, 2
+        0,
+        0,
+        1,
+        2
     )
 
+    # -------------------------------------
+    # 個別検証ボタンの説明
+    # -------------------------------------
+
+    validation_tooltips = {
+
+        "命名規則":
+
+            "Static Meshの名前が命名規則に従っているか検証します。\n"
+            "例：SM_Rock、SM_Tree",
+
+        "Transform":
+
+            "Translate・Rotate・Scaleを検証します。\n"
+            "Freeze Transformが適切に実行されているか確認します。",
+
+        "Construction History":
+
+            "メッシュに残っているConstruction Historyを検証します。\n"
+            "不要なモデリング履歴が残っていないか確認します。",
+
+        "N-gon":
+
+            "5頂点以上のポリゴンが存在するか検証します。\n"
+            "N-gonがあるメッシュを検出します。",
+
+        "UV":
+
+            "メッシュにUVが存在するか検証します。\n"
+            "UVが存在しないメッシュを検出します。"
+
+    }
+
+    # -------------------------------------
     # 個別検証ボタン
-    for index, (label, check_function) in enumerate(validation_checks):
+    # -------------------------------------
+
+    for index, (label, check_function) in enumerate(
+        validation_checks
+    ):
 
         button = QtWidgets.QPushButton(label)
 
-        button.setObjectName("checkButton")
+        button.setObjectName(
+            "checkButton"
+        )
+
+        button.setToolTip(
+            validation_tooltips.get(
+                label,
+                "選択したオブジェクトを検証します。"
+            )
+        )
 
         button.clicked.connect(
+
             lambda checked=False,
             func=check_function,
             check_title=label:
+
                 run_validation(
                     result_view,
                     func,
                     check_title
                 )
+
         )
 
         row = 1 + index // 2
+
         column = index % 2
 
         validation_layout.addWidget(
@@ -1826,14 +2605,21 @@ def show_ui():
             column
         )
 
-    main_layout.addWidget(validation_group)
+    left_layout.addWidget(
+        validation_group
+    )
 
     # =====================================
-    #  自動修正機能
+    # 02. 自動修正機能
     # =====================================
 
     auto_fix_group = QtWidgets.QGroupBox(
         "02 / 自動修正機能"
+    )
+
+    auto_fix_group.setToolTip(
+        "選択したメッシュの問題を自動的に修正します。\n"
+        "修正内容によっては元に戻せない場合があります。"
     )
 
     auto_fix_layout = QtWidgets.QGridLayout(
@@ -1841,88 +2627,143 @@ def show_ui():
     )
 
     auto_fix_layout.setContentsMargins(
-        14, 24, 14, 14
+        14,
+        24,
+        14,
+        14
     )
 
     auto_fix_layout.setSpacing(10)
 
+    # -------------------------------------
     # Transform自動修正
+    # -------------------------------------
+
     transform_fix_button = QtWidgets.QPushButton(
-        "Transformのフリーズをして再検証"
+        "Transform自動修正・再検証"
     )
 
     transform_fix_button.setObjectName(
         "fixButton"
     )
 
+    transform_fix_button.setToolTip(
+        "選択したメッシュのTranslate・Rotate・Scaleを修正します。\n"
+        "実行前に確認ダイアログが表示されます。\n"
+        "修正後は自動的に再検証します。"
+    )
+
     transform_fix_button.clicked.connect(
+
         lambda checked=False:
+
             run_transform_auto_fix(
                 result_view,
                 validation_checks,
                 WINDOW
             )
+
     )
 
+    # -------------------------------------
     # Construction History自動修正
+    # -------------------------------------
+
     history_fix_button = QtWidgets.QPushButton(
-        "Construction Historyを削除して再検証"
+        "Construction History削除・再検証"
     )
 
     history_fix_button.setObjectName(
         "fixButton"
     )
 
+    history_fix_button.setToolTip(
+        "選択したメッシュのConstruction Historyを削除します。\n"
+        "対応対象外の履歴は削除せずスキップします。\n"
+        "削除前に確認ダイアログが表示されます。"
+    )
+
     history_fix_button.clicked.connect(
+
         lambda checked=False:
+
             run_history_auto_fix(
                 result_view,
                 validation_checks,
                 WINDOW
             )
+
     )
 
+    # -------------------------------------
     # 命名規則自動修正
+    # -------------------------------------
+
     name_fix_button = QtWidgets.QPushButton(
-        "命名規則を自動修正して再検証"
+        "命名規則自動修正・再検証"
     )
 
     name_fix_button.setObjectName(
         "fixButton"
     )
 
+    name_fix_button.setToolTip(
+        "命名規則に違反したStatic Meshの名前にSM_を追加します。\n"
+        "例：Rock → SM_Rock\n"
+        "修正後は自動的に再検証します。"
+    )
+
     name_fix_button.clicked.connect(
+
         lambda checked=False:
+
             run_name_auto_fix(
                 result_view,
                 validation_checks,
                 WINDOW
             )
+
     )
+
+    # -------------------------------------
+    # ボタン配置
+    # -------------------------------------
 
     auto_fix_layout.addWidget(
         transform_fix_button,
-        0, 0
+        0,
+        0
     )
 
     auto_fix_layout.addWidget(
         history_fix_button,
-        0, 1
+        0,
+        1
     )
 
     auto_fix_layout.addWidget(
         name_fix_button,
-        1, 0, 1, 2
+        1,
+        0,
+        1,
+        2
     )
 
-    main_layout.addWidget(auto_fix_group)
+    left_layout.addWidget(
+        auto_fix_group
+    )
 
     # =====================================
-    # FBX書き出し・UE連携
+    # 03. FBX書き出し・UE連携
     # =====================================
 
     export_group = QtWidgets.QGroupBox(
         "03 / FBX書き出し・UE連携"
+    )
+
+    export_group.setToolTip(
+        "アセットをFBXとして書き出します。\n"
+        "UE連携を選択すると、Unreal Engineへ直接インポートします。"
     )
 
     export_layout = QtWidgets.QVBoxLayout(
@@ -1930,14 +2771,122 @@ def show_ui():
     )
 
     export_layout.setContentsMargins(
-        14, 24, 14, 14
+        14,
+        24,
+        14,
+        14
     )
 
     export_layout.setSpacing(10)
 
-    # =====================================
+    # -------------------------------------
+    # 書き出しモード
+    # -------------------------------------
+
+    mode_label = QtWidgets.QLabel(
+        "書き出しモード"
+    )
+
+    mode_label.setObjectName(
+        "ueDestinationLabel"
+    )
+
+    mode_label.setToolTip(
+        "書き出し前にアセット検証を行うか選択します。"
+    )
+
+    export_mode_combo = QtWidgets.QComboBox()
+
+    export_mode_combo.setObjectName(
+        "exportModeCombo"
+    )
+
+    export_mode_combo.addItem(
+        "厳格チェック",
+        "strict"
+    )
+
+    export_mode_combo.addItem(
+        "クイックモード",
+        "quick"
+    )
+
+    # 初期状態は厳格チェック
+    export_mode_combo.setCurrentIndex(0)
+
+    export_mode_combo.setToolTip(
+        "厳格チェック：5種類の検証を実行し、すべてOKの場合だけ書き出します。\n\n"
+        "クイックモード：検証を省略して、そのままFBXを書き出します。"
+    )
+
+    mode_layout = QtWidgets.QHBoxLayout()
+
+    mode_layout.addWidget(
+        mode_label
+    )
+
+    mode_layout.addWidget(
+        export_mode_combo,
+        1
+    )
+
+    export_layout.addLayout(
+        mode_layout
+    )
+
+    # -------------------------------------
+    # モード説明
+    # -------------------------------------
+
+    mode_description = QtWidgets.QLabel()
+
+    mode_description.setObjectName(
+        "modeDescriptionLabel"
+    )
+
+    mode_description.setWordWrap(True)
+
+    def update_mode_description():
+
+        current_mode = export_mode_combo.currentData()
+
+        if current_mode == "strict":
+
+            mode_description.setText(
+
+                "品質優先：命名規則・Transform・History・"
+                "N-gon・UVを検証します。\n"
+                "問題が検出された場合、書き出しを停止します。"
+
+            )
+
+        else:
+
+            mode_description.setText(
+
+                "速度優先：アセット検証を省略し、"
+                "すぐにFBXを書き出します。\n"
+                "検証を通していないアセットが出力される可能性があります。"
+
+            )
+
+    export_mode_combo.currentIndexChanged.connect(
+        update_mode_description
+    )
+
+    update_mode_description()
+
+    mode_description.setToolTip(
+        "現在選択している書き出しモードの動作説明です。"
+    )
+
+    export_layout.addWidget(
+        mode_description
+    )
+
+    # -------------------------------------
     # UE保存先
-    # =====================================
+    # -------------------------------------
 
     destination_layout = QtWidgets.QHBoxLayout()
 
@@ -1947,6 +2896,10 @@ def show_ui():
 
     destination_label.setObjectName(
         "ueDestinationLabel"
+    )
+
+    destination_label.setToolTip(
+        "Unreal EngineのContent Browser内での保存先です。"
     )
 
     ue_destination_input = QtWidgets.QLineEdit(
@@ -1959,6 +2912,11 @@ def show_ui():
 
     ue_destination_input.setPlaceholderText(
         "例：/Game/Environment/Rocks"
+    )
+
+    ue_destination_input.setToolTip(
+        "UEのContent Browser内の保存先を指定します。\n"
+        "Windowsのフォルダパスではなく、/Game/から始まるパスを入力してください。"
     )
 
     destination_layout.addWidget(
@@ -1974,68 +2932,92 @@ def show_ui():
         destination_layout
     )
 
-
-    # =====================================
-    # 通常のFBX書き出し
-    # =====================================
+    # -------------------------------------
+    # FBX単体書き出し
+    # -------------------------------------
 
     export_button = QtWidgets.QPushButton(
-        "検証してFBX書き出し"
+        "FBXを書き出す"
     )
 
     export_button.setObjectName(
         "exportButton"
     )
 
+    export_button.setToolTip(
+        "選択したアセットをFBXとして書き出します。\n"
+        "上の書き出しモードに従って検証を行います。\n"
+        "UEへのインポートは行いません。"
+    )
+
     export_button.clicked.connect(
+
         lambda checked=False:
+
             run_validate_and_export(
                 result_view,
-                validation_checks
+                validation_checks,
+                export_mode_combo
             )
+
     )
 
     export_layout.addWidget(
         export_button
     )
 
-
-    # =====================================
+    # -------------------------------------
     # UEへ送信
-    # =====================================
+    # -------------------------------------
 
     export_to_ue_button = QtWidgets.QPushButton(
-        "検証してUEへ送信"
+        "FBXを書き出してUEへ送信"
     )
 
     export_to_ue_button.setObjectName(
         "sendToUEButton"
     )
 
+    export_to_ue_button.setToolTip(
+        "選択したアセットをFBXとして書き出し、\n"
+        "起動中のUnreal Engineへ自動インポートします。\n\n"
+        "上の書き出しモードに従って検証を行います。"
+    )
+
     export_to_ue_button.clicked.connect(
+
         lambda checked=False:
+
             run_validate_export_and_import(
                 result_view,
                 validation_checks,
-                ue_destination_input
+                ue_destination_input,
+                export_mode_combo
             )
+
     )
 
     export_layout.addWidget(
         export_to_ue_button
     )
 
-
-    main_layout.addWidget(
+    left_layout.addWidget(
         export_group
     )
 
+    # 左側の余白
+    left_layout.addStretch(1)
+
     # =====================================
-    # 04. 検証結果表示
+    #  検証結果表示
     # =====================================
 
     report_group = QtWidgets.QGroupBox(
         "04 / 検証結果表示"
+    )
+
+    report_group.setToolTip(
+        "検証・自動修正・FBX書き出し・UEインポートの結果を表示します。"
     )
 
     report_layout = QtWidgets.QVBoxLayout(
@@ -2043,28 +3025,48 @@ def show_ui():
     )
 
     report_layout.setContentsMargins(
-        14, 24, 14, 14
+        14,
+        24,
+        14,
+        14
     )
 
     result_view = QtWidgets.QPlainTextEdit()
 
-    result_view.setObjectName("resultView")
+    result_view.setObjectName(
+        "resultView"
+    )
 
     result_view.setReadOnly(True)
 
     result_view.setPlaceholderText(
-        "検証・自動修正・FBX書き出しの結果がここに表示されます。"
+        "検証・自動修正・FBX書き出し・UEインポートの結果がここに表示されます。"
     )
 
-    report_layout.addWidget(result_view)
+    result_view.setToolTip(
+        "検証・自動修正・FBX書き出し・UEインポートの結果を表示します。"
+    )
 
-    main_layout.addWidget(
+    report_layout.addWidget(
+        result_view
+    )
+
+    right_layout.addWidget(
         report_group,
         1
     )
 
     # =====================================
-    # 05. デザイン
+    # 左右レイアウトをメイン画面に追加
+    # =====================================
+
+    main_layout.addWidget(
+        content_splitter,
+        1
+    )
+
+    # =====================================
+    #  デザイン
     # =====================================
 
     WINDOW.setStyleSheet("""
@@ -2156,6 +3158,47 @@ def show_ui():
             background-color: #294638;
         }
 
+        QLabel#ueDestinationLabel {
+            color: #D6E1EA;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        QLineEdit#ueDestinationInput {
+            background-color: #222B35;
+            color: #D6E1EA;
+            font-size: 12px;
+            padding: 9px;
+            border: 1px solid #354253;
+            border-radius: 5px;
+        }
+
+        QLineEdit#ueDestinationInput:focus {
+            border: 1px solid #68C8DC;
+        }
+
+        QComboBox#exportModeCombo {
+            background-color: #252F3C;
+            color: #F0F3F7;
+            font-size: 12px;
+            padding: 8px;
+            border: 1px solid #354253;
+            border-radius: 5px;
+        }
+
+        QComboBox#exportModeCombo:hover {
+            border: 1px solid #68C8DC;
+        }
+
+        QLabel#modeDescriptionLabel {
+            color: #AAB6C5;
+            font-size: 11px;
+            padding: 8px;
+            background-color: #222B35;
+            border: 1px solid #354253;
+            border-radius: 5px;
+        }
+
         QPushButton#exportButton {
             background-color: #24647A;
             color: #FFFFFF;
@@ -2174,6 +3217,24 @@ def show_ui():
             background-color: #19495C;
         }
 
+        QPushButton#sendToUEButton {
+            background-color: #574C78;
+            color: #FFFFFF;
+            font-size: 14px;
+            font-weight: bold;
+            padding: 15px;
+            border: none;
+            border-radius: 6px;
+        }
+
+        QPushButton#sendToUEButton:hover {
+            background-color: #70619A;
+        }
+
+        QPushButton#sendToUEButton:pressed {
+            background-color: #44395F;
+        }
+
         QPlainTextEdit#resultView {
             background-color: #222B35;
             color: #D6E1EA;
@@ -2183,28 +3244,54 @@ def show_ui():
             padding: 10px;
         }
 
-
-        QLineEdit#ueDestinationInput:focus {
-        border: 1px solid #68C8DC;
+        QToolTip {
+            background-color: #222B35;
+            color: #F0F3F7;
+            font-size: 11px;
+            padding: 8px;
+            border: 1px solid #68C8DC;
+            border-radius: 5px;
+        }
+                         
+        QSplitter#mainContentSplitter::handle {
+        background-color: #354253;
+        width: 6px;
         }
 
-    QPushButton#sendToUEButton {
-        background-color: #574C78;
-        color: #FFFFFF;
-        font-size: 14px;
-        font-weight: bold;
-        padding: 15px;
+        QSplitter#mainContentSplitter::handle:hover {
+        background-color: #68C8DC;
+        }
+
+        QScrollArea {
         border: none;
-        border-radius: 6px;
-    }
+        background-color: transparent;
+        }
+                         
+        QWidget#leftPanel {
+        background-color: #171D27;
+        }
 
-    QPushButton#sendToUEButton:hover {
-        background-color: #70619A;
-    }
+        QWidget#rightPanel {
+        background-color: #171D27;
+        }
 
-    QPushButton#sendToUEButton:pressed {
-        background-color: #44395F;
-    }
-        """)
+        QSplitter#mainContentSplitter::handle {
+            background-color: #354253;
+            width: 6px;
+        }
+
+        QSplitter#mainContentSplitter::handle:hover {
+            background-color: #68C8DC;
+        }
+
+    """)
+
+    # =====================================
+    #  UI表示
+    # =====================================
 
     WINDOW.show()
+
+    print(
+        "Maya → Unreal Export Toolkitを起動しました。"
+    )
