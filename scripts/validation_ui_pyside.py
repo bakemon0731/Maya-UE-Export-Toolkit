@@ -78,7 +78,7 @@ for directory in [SCRIPT_DIR, UE_SCRIPT_DIR]:
 
 
 # =========================================
-# 02. モジュール読み込み
+# モジュール読み込み
 # =========================================
 
 import validate_names
@@ -92,6 +92,7 @@ import fix_transforms
 import fix_history
 
 import export_fbx
+import validation_result_widget
 
 
 # =========================================
@@ -2156,7 +2157,6 @@ def run_validate_export_and_import(
 
     print(output_text)
 
-
 # =========================================
 # UI作成
 # =========================================
@@ -2220,6 +2220,8 @@ def show_ui():
     importlib.reload(fix_history)
 
     importlib.reload(export_fbx)
+
+    importlib.reload(validation_result_widget)
 
     # -------------------------------------
     # 検証関数一覧
@@ -3009,7 +3011,7 @@ def show_ui():
     left_layout.addStretch(1)
 
     # =====================================
-    #  検証結果表示
+    # 04. 検証結果表示
     # =====================================
 
     report_group = QtWidgets.QGroupBox(
@@ -3025,13 +3027,17 @@ def show_ui():
     )
 
     report_layout.setContentsMargins(
-        14,
-        24,
-        14,
-        14
+        14, 24, 14, 14
     )
 
-    result_view = QtWidgets.QPlainTextEdit()
+    report_layout.setSpacing(10)
+
+
+    # -------------------------------------
+    # 検証結果表示ウィジェット
+    # -------------------------------------
+
+    result_view = validation_result_widget.StatusResultWidget()
 
     result_view.setObjectName(
         "resultView"
@@ -3044,12 +3050,21 @@ def show_ui():
     )
 
     result_view.setToolTip(
-        "検証・自動修正・FBX書き出し・UEインポートの結果を表示します。"
+        "検証結果を一覧表示します。\n"
+        "OK・NG・WARNINGなどの状態を色付きバッジで確認できます。\n"
+        "下部には実行ログと詳細情報が表示されます。"
     )
 
+
     report_layout.addWidget(
-        result_view
+        result_view,
+        1
     )
+
+
+    # -------------------------------------
+    # 右側パネルに追加
+    # -------------------------------------
 
     right_layout.addWidget(
         report_group,
@@ -3235,15 +3250,6 @@ def show_ui():
             background-color: #44395F;
         }
 
-        QPlainTextEdit#resultView {
-            background-color: #222B35;
-            color: #D6E1EA;
-            font-size: 12px;
-            border: none;
-            border-radius: 5px;
-            padding: 10px;
-        }
-
         QToolTip {
             background-color: #222B35;
             color: #F0F3F7;
@@ -3284,6 +3290,22 @@ def show_ui():
             background-color: #68C8DC;
         }
 
+        QLabel#resultDetailLabel {
+        color: #68C8DC;
+        font-size: 11px;
+        font-weight: bold;
+        padding-top: 5px;
+        }
+
+        QPlainTextEdit#resultLogView {
+        background-color: #222B35;
+        color: #D6E1EA;
+        font-size: 11px;
+        border: 1px solid #354253;
+        border-radius: 5px;
+        padding: 10px;
+        }
+        
     """)
 
     # =====================================

@@ -1,0 +1,6 @@
+ファイル	役割
+launcher.py	ホーム画面を起動する
+main_window.py	ホーム画面のレイアウトを作る
+tool_registry.py	登録されている機能の情報を管理する
+tool_card_widget.py	機能カードの見た目を作る
+validation_ui_pyside.py	Maya→Unreal Exportの機能を実行する
