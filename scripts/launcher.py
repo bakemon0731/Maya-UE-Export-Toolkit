@@ -42,6 +42,10 @@ def show_ui():
         mpt_ui.tool_registry
     )
 
+    # ツール管理クラスを再読み込み
+    import mpt_ui.tool_manager
+    importlib.reload(mpt_ui.tool_manager)
+
     # メイン画面を再読み込み
     import mpt_ui.main_window
     importlib.reload(

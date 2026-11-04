@@ -36,6 +36,8 @@ from mpt_ui.widgets.tool_card_widget import ToolCardWidget
 
 from mpt_ui.tool_registry import get_tool_definitions
 
+from mpt_ui.tool_manager import ToolManager
+
 
 # =========================================
 # 01. パス設定
@@ -87,14 +89,17 @@ class ProductionToolkitWindow(QtWidgets.QWidget):
         )
 
         self.resize(
-            950,
-            700
+            1400,
+            900
         )
 
         self.setMinimumSize(
-            750,
-            550
+            1100,
+            750
         )
+
+        # ツール管理クラスを生成
+        self.tool_manager = ToolManager()
 
         self.build_ui()
 
@@ -424,58 +429,16 @@ class ProductionToolkitWindow(QtWidgets.QWidget):
 
     def launch_tool(self, tool_info):
 
+        tool_title = (
+            tool_info.get("title", "不明な機能")
+            if isinstance(tool_info, dict)
+            else "不明な機能"
+        )
+
         try:
 
-            # ---------------------------------
-            # 01. 起動する機能の情報を取得
-            # ---------------------------------
-
-            module_name = tool_info["module"]
-
-            function_name = tool_info["function"]
-
-            tool_title = tool_info["title"]
-
-            # ---------------------------------
-            # 02. 起動情報の確認
-            # ---------------------------------
-
-            if not module_name or not function_name:
-
-                raise ValueError(
-                    "起動するモジュールまたは関数が登録されていません。"
-                )
-
-            # ---------------------------------
-            # 03. Pythonモジュールを読み込む
-            # ---------------------------------
-
-            if module_name in sys.modules:
-
-                module = importlib.reload(
-                    sys.modules[module_name]
-                )   
-
-            else:
-
-                module = importlib.import_module(
-                    module_name
-                )
-
-            # ---------------------------------
-            # 04. 起動関数を取得する
-            # ---------------------------------
-
-            launch_function = getattr(
-                module,
-                function_name
-            )
-
-            # ---------------------------------
-            # 05. 機能を起動する
-            # ---------------------------------
-
-            launch_function()
+            # ToolManagerに機能の起動を依頼
+            self.tool_manager.launch(tool_info)
 
         except Exception:
 
@@ -490,8 +453,9 @@ class ProductionToolkitWindow(QtWidgets.QWidget):
                 "機能起動エラー",
 
                 tool_title
-                + "を起動できませんでした。 \n\n"
+                + "を起動できませんでした。\n\n"
                 + error_text
+
             )
 
 
