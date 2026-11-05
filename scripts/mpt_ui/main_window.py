@@ -3,13 +3,37 @@
 # Maya Production Toolkit
 # Main Window
 # =========================================
-
 import os
 import sys
 import importlib
 import traceback
 
 import maya.cmds as cmds
+
+# =========================================
+# パス設定
+# =========================================
+
+SCRIPT_DIR = os.path.dirname(
+    os.path.dirname(
+        os.path.abspath(__file__)
+    )
+)
+
+if SCRIPT_DIR not in sys.path:
+
+    sys.path.insert(0, SCRIPT_DIR)
+
+
+# =========================================
+# ローカルモジュール
+# =========================================
+
+from mpt_ui.widgets.tool_card_widget import ToolCardWidget
+
+from mpt_ui import tool_registry
+
+from mpt_ui.tool_manager import ToolManager
 
 try:
 
@@ -29,32 +53,6 @@ except ImportError:
     WINDOW_FLAG = QtCore.Qt.Window
     ALIGN_CENTER = QtCore.Qt.AlignCenter
 
-
-from maya import OpenMayaUI as omui
-
-from mpt_ui.widgets.tool_card_widget import ToolCardWidget
-
-from mpt_ui.tool_registry import get_tool_definitions
-
-from mpt_ui.tool_manager import ToolManager
-
-
-# =========================================
-# 01. パス設定
-# =========================================
-
-SCRIPT_DIR = os.path.dirname(
-    os.path.dirname(
-        os.path.abspath(__file__)
-    )
-)
-
-if SCRIPT_DIR not in sys.path:
-
-    sys.path.insert(
-        0,
-        SCRIPT_DIR
-    )
 
 
 # =========================================
@@ -224,8 +222,11 @@ class ProductionToolkitWindow(QtWidgets.QWidget):
         # 05. 機能カード
         # =================================
 
+        # tool_registryを最新の状態に更新
+        importlib.reload(tool_registry)
+
         # 登録されている機能情報を取得
-        tool_definitions = get_tool_definitions()
+        tool_definitions = tool_registry.get_tool_definitions()
 
         # 機能情報を順番に読み込む
         for index, tool_info in enumerate(tool_definitions):

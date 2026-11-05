@@ -60,17 +60,17 @@ def get_tool_definitions():
             "title": "Phong → Arnold Converter",
 
             "description": (
-                "PhongマテリアルをArnoldの"
-                "aiStandardSurfaceへ変換します。"
+                "Phongマテリアルの検出・変換・管理を行い、"
+                "Arnold aiStandardSurfaceへ変換します。"
             ),
 
-            "status": "準備中",
+            "status": "利用可能",
 
-            "enabled": False,
+            "enabled": True,
 
-            "module": None,
+            "module": "material_tools.phong_to_arnold_ui",
 
-            "function": None
+            "function": "show_ui"
         },
 
         # =================================
