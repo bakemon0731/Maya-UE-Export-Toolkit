@@ -1,5 +1,7 @@
+
 import importlib
 import traceback
+
 
 # =========================================
 # 00. Qtライブラリ読み込み
@@ -13,6 +15,32 @@ try:
 
     WINDOW_FLAG = QtCore.Qt.WindowType.Window
 
+    ALIGN_CENTER = QtCore.Qt.AlignmentFlag.AlignCenter
+
+    NO_EDIT_TRIGGERS = (
+        QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers
+    )
+
+    SELECT_ROWS = (
+        QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows
+    )
+
+    EXTENDED_SELECTION = (
+        QtWidgets.QAbstractItemView.SelectionMode.ExtendedSelection
+    )
+
+    RESIZE_TO_CONTENTS = (
+        QtWidgets.QHeaderView.ResizeMode.ResizeToContents
+    )
+
+    STRETCH = (
+        QtWidgets.QHeaderView.ResizeMode.Stretch
+    )
+
+    MESSAGE_YES = QtWidgets.QMessageBox.StandardButton.Yes
+
+    MESSAGE_NO = QtWidgets.QMessageBox.StandardButton.No
+
 except ImportError:
 
     from PySide2 import QtCore, QtWidgets
@@ -20,6 +48,32 @@ except ImportError:
     from shiboken2 import wrapInstance
 
     WINDOW_FLAG = QtCore.Qt.Window
+
+    ALIGN_CENTER = QtCore.Qt.AlignCenter
+
+    NO_EDIT_TRIGGERS = (
+        QtWidgets.QAbstractItemView.NoEditTriggers
+    )
+
+    SELECT_ROWS = (
+        QtWidgets.QAbstractItemView.SelectRows
+    )
+
+    EXTENDED_SELECTION = (
+        QtWidgets.QAbstractItemView.ExtendedSelection
+    )
+
+    RESIZE_TO_CONTENTS = (
+        QtWidgets.QHeaderView.ResizeToContents
+    )
+
+    STRETCH = (
+        QtWidgets.QHeaderView.Stretch
+    )
+
+    MESSAGE_YES = QtWidgets.QMessageBox.Yes
+
+    MESSAGE_NO = QtWidgets.QMessageBox.No
 
 
 from maya import OpenMayaUI as omui
@@ -59,9 +113,15 @@ class PhongToArnoldWindow(QtWidgets.QWidget):
             WINDOW_FLAG
         )
 
-        self.resize(1100, 580)
+        self.resize(
+            1200,
+            600
+        )
 
-        self.setMinimumSize(850, 450)
+        self.setMinimumSize(
+            900,
+            450
+        )
 
         self.build_ui()
 
@@ -128,7 +188,7 @@ class PhongToArnoldWindow(QtWidgets.QWidget):
         )
 
         # =================================
-        # マテリアル一覧
+        # 変換対象一覧
         # =================================
 
         self.material_table = QtWidgets.QTableWidget()
@@ -155,37 +215,20 @@ class PhongToArnoldWindow(QtWidgets.QWidget):
         # テーブルの操作設定
         # ---------------------------------
 
-        try:
+        # セルの直接編集を禁止
+        self.material_table.setEditTriggers(
+            NO_EDIT_TRIGGERS
+        )
 
-            # PySide6
+        # 行単位で選択
+        self.material_table.setSelectionBehavior(
+            SELECT_ROWS
+        )
 
-            self.material_table.setEditTriggers(
-                QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers
-            )
-
-            self.material_table.setSelectionBehavior(
-                QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows
-            )
-
-            self.material_table.setSelectionMode(
-                QtWidgets.QAbstractItemView.SelectionMode.SingleSelection
-            )
-
-        except AttributeError:
-
-            # PySide2
-
-            self.material_table.setEditTriggers(
-                QtWidgets.QAbstractItemView.NoEditTriggers
-            )
-
-            self.material_table.setSelectionBehavior(
-                QtWidgets.QAbstractItemView.SelectRows
-            )
-
-            self.material_table.setSelectionMode(
-                QtWidgets.QAbstractItemView.SingleSelection
-            )
+        # Ctrl・Shiftによる複数行選択
+        self.material_table.setSelectionMode(
+            EXTENDED_SELECTION
+        )
 
         # ---------------------------------
         # テーブルの表示設定
@@ -199,12 +242,8 @@ class PhongToArnoldWindow(QtWidgets.QWidget):
             True
         )
 
+        # 行番号を非表示
         self.material_table.verticalHeader().setVisible(
-            False
-        )
-
-        # 行の並び替えによる選択処理の混乱を防止
-        self.material_table.setSortingEnabled(
             False
         )
 
@@ -214,63 +253,30 @@ class PhongToArnoldWindow(QtWidgets.QWidget):
 
         header = self.material_table.horizontalHeader()
 
-        try:
+        header.setSectionResizeMode(
+            0,
+            RESIZE_TO_CONTENTS
+        )
 
-            # PySide6
+        header.setSectionResizeMode(
+            1,
+            RESIZE_TO_CONTENTS
+        )
 
-            header.setSectionResizeMode(
-                0,
-                QtWidgets.QHeaderView.ResizeMode.ResizeToContents
-            )
+        header.setSectionResizeMode(
+            2,
+            RESIZE_TO_CONTENTS
+        )
 
-            header.setSectionResizeMode(
-                1,
-                QtWidgets.QHeaderView.ResizeMode.ResizeToContents
-            )
+        header.setSectionResizeMode(
+            3,
+            RESIZE_TO_CONTENTS
+        )
 
-            header.setSectionResizeMode(
-                2,
-                QtWidgets.QHeaderView.ResizeMode.ResizeToContents
-            )
-
-            header.setSectionResizeMode(
-                3,
-                QtWidgets.QHeaderView.ResizeMode.ResizeToContents
-            )
-
-            header.setSectionResizeMode(
-                4,
-                QtWidgets.QHeaderView.ResizeMode.Stretch
-            )
-
-        except AttributeError:
-
-            # PySide2
-
-            header.setSectionResizeMode(
-                0,
-                QtWidgets.QHeaderView.ResizeToContents
-            )
-
-            header.setSectionResizeMode(
-                1,
-                QtWidgets.QHeaderView.ResizeToContents
-            )
-
-            header.setSectionResizeMode(
-                2,
-                QtWidgets.QHeaderView.ResizeToContents
-            )
-
-            header.setSectionResizeMode(
-                3,
-                QtWidgets.QHeaderView.ResizeToContents
-            )
-
-            header.setSectionResizeMode(
-                4,
-                QtWidgets.QHeaderView.Stretch
-            )
+        header.setSectionResizeMode(
+            4,
+            STRETCH
+        )
 
         # ---------------------------------
         # 選択状態の変更を監視
@@ -280,7 +286,7 @@ class PhongToArnoldWindow(QtWidgets.QWidget):
             self.update_convert_button_state
         )
 
-        # テーブルをメインレイアウトに追加
+        # テーブルを追加
         main_layout.addWidget(
             self.material_table,
             1
@@ -311,7 +317,7 @@ class PhongToArnoldWindow(QtWidgets.QWidget):
         )
 
         # ---------------------------------
-        # 変換ボタン
+        # 選択したマテリアルの変換ボタン
         # ---------------------------------
 
         self.convert_button = QtWidgets.QPushButton(
@@ -326,8 +332,27 @@ class PhongToArnoldWindow(QtWidgets.QWidget):
             self.convert_selected_material
         )
 
-        # 最初は未選択なので無効
         self.convert_button.setEnabled(
+            False
+        )
+
+        # ---------------------------------
+        # 未変換マテリアルの一括変換ボタン
+        # ---------------------------------
+
+        self.convert_all_button = QtWidgets.QPushButton(
+            "未変換を一括変換"
+        )
+
+        self.convert_all_button.setObjectName(
+            "convertAllButton"
+        )
+
+        self.convert_all_button.clicked.connect(
+            self.convert_all_unconverted_materials
+        )
+
+        self.convert_all_button.setEnabled(
             False
         )
 
@@ -347,13 +372,20 @@ class PhongToArnoldWindow(QtWidgets.QWidget):
             self.close
         )
 
+        # ---------------------------------
         # ボタンを配置
+        # ---------------------------------
+
         button_layout.addWidget(
             self.refresh_button
         )
 
         button_layout.addWidget(
             self.convert_button
+        )
+
+        button_layout.addWidget(
+            self.convert_all_button
         )
 
         button_layout.addWidget(
@@ -449,7 +481,21 @@ class PhongToArnoldWindow(QtWidgets.QWidget):
                 background-color: #34977D;
             }
 
-            QPushButton#convertButton:disabled {
+            QPushButton#convertAllButton {
+                background-color: #356B52;
+                color: white;
+                font-weight: bold;
+                padding: 10px 20px;
+                border: none;
+                border-radius: 5px;
+            }
+
+            QPushButton#convertAllButton:hover {
+                background-color: #468B69;
+            }
+
+            QPushButton#convertButton:disabled,
+            QPushButton#convertAllButton:disabled {
                 background-color: #354253;
                 color: #778596;
             }
@@ -484,12 +530,16 @@ class PhongToArnoldWindow(QtWidgets.QWidget):
 
         """
         マテリアルが選択されている場合だけ
-        変換ボタンを有効にする。
+        選択変換ボタンを有効にする。
         """
 
-        selected_row = self.material_table.currentRow()
+        selected_rows = (
+            self.material_table
+            .selectionModel()
+            .selectedRows()
+        )
 
-        has_selection = selected_row >= 0
+        has_selection = len(selected_rows) > 0
 
         self.convert_button.setEnabled(
             has_selection
@@ -532,7 +582,7 @@ class PhongToArnoldWindow(QtWidgets.QWidget):
 
             conversion_info = {}
 
-            # 同じPhongを何度も検索しないようにする
+            # 同じPhongを何度も検索しない
             for info in material_infos:
 
                 material = info.get(
@@ -663,44 +713,14 @@ class PhongToArnoldWindow(QtWidgets.QWidget):
                     )
 
                     # ---------------------------------
-                    # 状態列の中央揃え
+                    # 中央揃え
                     # ---------------------------------
 
-                    if column == 1:
+                    if column in (1, 2):
 
-                        try:
-
-                            item.setTextAlignment(
-                                QtCore.Qt.AlignmentFlag.AlignCenter
-                            )
-
-                        except AttributeError:
-
-                            item.setTextAlignment(
-                                QtCore.Qt.AlignCenter
-                            )
-
-                    # ---------------------------------
-                    # Arnold名の中央揃え
-                    # ---------------------------------
-
-                    if column == 2:
-
-                        try:
-
-                            item.setTextAlignment(
-                                QtCore.Qt.AlignmentFlag.AlignCenter
-                            )
-
-                        except AttributeError:
-
-                            item.setTextAlignment(
-                                QtCore.Qt.AlignCenter
-                            )
-
-                    # ---------------------------------
-                    # アイテムをテーブルに追加
-                    # ---------------------------------
+                        item.setTextAlignment(
+                            ALIGN_CENTER
+                        )
 
                     self.material_table.setItem(
                         row,
@@ -725,9 +745,7 @@ class PhongToArnoldWindow(QtWidgets.QWidget):
             )
 
             unconverted_count = (
-
                 material_count - converted_count
-
             )
 
             info_count = len(material_infos)
@@ -769,11 +787,23 @@ class PhongToArnoldWindow(QtWidgets.QWidget):
                     "Phongマテリアルは見つかりませんでした。"
                 )
 
-            # 一覧更新後は選択を解除
+            # ---------------------------------
+            # 選択状態を解除
+            # ---------------------------------
+
             self.material_table.clearSelection()
 
             self.convert_button.setEnabled(
                 False
+            )
+
+            # ---------------------------------
+            # 未変換が存在する場合だけ
+            # 一括変換ボタンを有効にする
+            # ---------------------------------
+
+            self.convert_all_button.setEnabled(
+                unconverted_count > 0
             )
 
             print(
@@ -790,6 +820,14 @@ class PhongToArnoldWindow(QtWidgets.QWidget):
                 "マテリアル情報の取得に失敗しました。"
             )
 
+            self.convert_button.setEnabled(
+                False
+            )
+
+            self.convert_all_button.setEnabled(
+                False
+            )
+
             QtWidgets.QMessageBox.critical(
 
                 self,
@@ -802,56 +840,215 @@ class PhongToArnoldWindow(QtWidgets.QWidget):
             )
 
     # =====================================
-    # 06. 選択したPhongをArnoldに変換
+    # 06. 選択されたPhongマテリアルを取得
+    # =====================================
+
+    def get_selected_phong_materials(self):
+
+        """
+        テーブルで選択されたPhongマテリアルを取得する。
+
+        複数Shading Groupによる重複も排除する。
+        """
+
+        selected_rows = (
+            self.material_table
+            .selectionModel()
+            .selectedRows()
+        )
+
+        phong_materials = []
+
+        for index in selected_rows:
+
+            row = index.row()
+
+            item = self.material_table.item(
+                row,
+                0
+            )
+
+            if not item:
+
+                continue
+
+            material = item.text()
+
+            if material and material not in phong_materials:
+
+                phong_materials.append(
+                    material
+                )
+
+        return phong_materials
+
+    # =====================================
+    # 07. 未変換Phongマテリアルを取得
+    # =====================================
+
+    def get_unconverted_phong_materials(self):
+
+        """
+        テーブルから未変換のPhongマテリアルを取得する。
+
+        同じPhongが複数行に表示されていても
+        一度だけ取得する。
+        """
+
+        phong_materials = []
+
+        for row in range(
+            self.material_table.rowCount()
+        ):
+
+            material_item = self.material_table.item(
+                row,
+                0
+            )
+
+            status_item = self.material_table.item(
+                row,
+                1
+            )
+
+            if not material_item or not status_item:
+
+                continue
+
+            material = material_item.text()
+
+            status = status_item.text()
+
+            # 未変換だけを対象にする
+            if status != "未変換":
+
+                continue
+
+            # 重複を防止
+            if material not in phong_materials:
+
+                phong_materials.append(
+                    material
+                )
+
+        return phong_materials
+
+    # =====================================
+    # 08. 選択したマテリアルを変換
     # =====================================
 
     def convert_selected_material(self):
 
         """
-        テーブルで選択されたPhongマテリアルを
-        Arnold Standard Surfaceへ変換する。
+        選択されたPhongマテリアルを変換する。
+        """
+
+        phong_materials = (
+            self.get_selected_phong_materials()
+        )
+
+        self.execute_conversion(
+            phong_materials,
+            "選択したマテリアルの変換"
+        )
+
+    # =====================================
+    # 09. 未変換マテリアルを一括変換
+    # =====================================
+
+    def convert_all_unconverted_materials(self):
+
+        """
+        シーン内の未変換Phongマテリアルを
+        すべて変換する。
+        """
+
+        phong_materials = (
+            self.get_unconverted_phong_materials()
+        )
+
+        self.execute_conversion(
+            phong_materials,
+            "未変換マテリアルの一括変換"
+        )
+
+    # =====================================
+    # 10. 共通変換処理
+    # =====================================
+
+    def execute_conversion(
+        self,
+        phong_materials,
+        operation_name
+    ):
+
+        """
+        複数のPhongマテリアルを変換する。
+
+        選択変換と一括変換の両方から呼び出す。
         """
 
         try:
 
             # ---------------------------------
-            # 選択行を取得
+            # 変換対象がない場合
             # ---------------------------------
 
-            selected_row = self.material_table.currentRow()
+            if not phong_materials:
 
-            if selected_row < 0:
-
-                QtWidgets.QMessageBox.warning(
+                QtWidgets.QMessageBox.information(
 
                     self,
 
-                    "選択エラー",
+                    "変換対象なし",
 
-                    "変換するPhongマテリアルを選択してください。"
+                    "変換対象のPhongマテリアルがありません。"
 
                 )
 
                 return
 
             # ---------------------------------
-            # 選択行のPhong名を取得
+            # 確認ダイアログ
             # ---------------------------------
 
-            material_item = self.material_table.item(
-                selected_row,
-                0
+            material_count = len(
+                phong_materials
             )
 
-            if not material_item:
+            material_list = "\n".join(
 
-                return
+                "- " + material
 
-            phong_material = material_item.text()
+                for material in phong_materials[:10]
 
-            # ---------------------------------
-            # 変換確認
-            # ---------------------------------
+            )
+
+            if material_count > 10:
+
+                material_list += (
+
+                    "\n...ほか {} 件".format(
+
+                        material_count - 10
+
+                    )
+
+                )
+
+            confirmation_message = (
+
+                "{}を実行しますか？\n\n".format(
+                    operation_name
+                )
+
+                + "対象: {}件\n\n".format(
+                    material_count
+                )
+
+                + material_list
+
+            )
 
             answer = QtWidgets.QMessageBox.question(
 
@@ -859,144 +1056,176 @@ class PhongToArnoldWindow(QtWidgets.QWidget):
 
                 "変換確認",
 
-                "次のPhongマテリアルをArnoldに変換しますか？\n\n"
-                + phong_material,
+                confirmation_message,
 
-                QtWidgets.QMessageBox.StandardButton.Yes
-                | QtWidgets.QMessageBox.StandardButton.No
+                MESSAGE_YES | MESSAGE_NO
 
             )
 
-            if answer != QtWidgets.QMessageBox.StandardButton.Yes:
+            if answer != MESSAGE_YES:
 
                 return
 
-            # ---------------------------------
-            # Converterモジュールを再読み込み
-            # ---------------------------------
+            # =================================
+            # Converterモジュールの再読み込み
+            # =================================
 
             importlib.reload(
                 phong_to_arnold_converter
             )
 
-            # ---------------------------------
-            # 変換処理を実行
-            # ---------------------------------
+            # =================================
+            # 複数マテリアルの変換
+            # =================================
 
             result = (
+
                 phong_to_arnold_converter
                 .auto_convert_phong_to_arnold(
-                    [phong_material]
+                    phong_materials
                 )
+
             )
 
             # =================================
-            # 変換結果を取得
+            # 集計情報を取得
             # =================================
 
-            results = result.get(
+            summary = result.get(
+                "summary",
+                {}
+            )
+
+            success_count = summary.get(
+                "success",
+                0
+            )
+
+            skipped_count = summary.get(
+                "skipped",
+                0
+            )
+
+            error_count = summary.get(
+                "errors",
+                0
+            )
+
+            # =================================
+            # 個別結果を整理
+            # =================================
+
+            detail_lines = []
+
+            conversion_results = result.get(
                 "results",
                 []
             )
 
-            material_result = None
+            for item in conversion_results:
 
-            for item in results:
-
-                if item.get("material") == phong_material:
-
-                    material_result = item
-
-                    break
-
-            # =================================
-            # 変換結果の表示
-            # =================================
-
-            if material_result:
-
-                status = material_result.get(
-                    "status"
+                material = item.get(
+                    "material",
+                    "不明"
                 )
 
-                message = material_result.get(
-                    "message",
-                    "処理が完了しました。"
+                status = item.get(
+                    "status",
+                    "不明"
                 )
 
-                arnold_material = material_result.get(
+                arnold_material = item.get(
                     "arnold_material"
                 )
 
-                # ---------------------------------
-                # 成功
-                # ---------------------------------
+                status_label = {
 
-                if status == "OK":
+                    "OK": "成功",
 
-                    QtWidgets.QMessageBox.information(
+                    "SKIP": "スキップ",
 
-                        self,
+                    "ERROR": "エラー"
 
-                        "変換完了",
+                }.get(
+                    status,
+                    status
+                )
 
-                        "Arnoldへの変換が完了しました。\n\n"
-                        "Phong: {}\n"
-                        "Arnold: {}".format(
+                detail = "[{}] {}".format(
+                    status_label,
+                    material
+                )
 
-                            phong_material,
+                if arnold_material:
 
-                            arnold_material
+                    detail += "\n    Arnold: {}".format(
+                        arnold_material
+                    )
+
+                detail_lines.append(
+                    detail
+                )
+
+            # =================================
+            # 結果メッセージを作成
+            # =================================
+
+            result_message = (
+
+                "変換処理が完了しました。\n\n"
+
+                "対象: {}件\n"
+                "成功: {}件\n"
+                "スキップ: {}件\n"
+                "エラー: {}件"
+
+            ).format(
+
+                material_count,
+
+                success_count,
+
+                skipped_count,
+
+                error_count
+
+            )
+
+            # ---------------------------------
+            # 個別結果を追加
+            # ---------------------------------
+
+            if detail_lines:
+
+                display_details = detail_lines[:20]
+
+                result_message += (
+
+                    "\n\n===== 個別結果 =====\n\n"
+
+                    + "\n\n".join(
+                        display_details
+                    )
+
+                )
+
+                if len(detail_lines) > 20:
+
+                    result_message += (
+
+                        "\n\n...ほか {} 件".format(
+
+                            len(detail_lines) - 20
 
                         )
 
                     )
 
-                # ---------------------------------
-                # スキップ
-                # ---------------------------------
+            # =================================
+            # 結果を表示
+            # =================================
 
-                elif status == "SKIP":
-
-                    QtWidgets.QMessageBox.information(
-
-                        self,
-
-                        "変換スキップ",
-
-                        "{}\n\n{}".format(
-
-                            phong_material,
-
-                            message
-
-                        )
-
-                    )
-
-                # ---------------------------------
-                # エラー
-                # ---------------------------------
-
-                elif status == "ERROR":
-
-                    QtWidgets.QMessageBox.warning(
-
-                        self,
-
-                        "変換エラー",
-
-                        "{}\n\n{}".format(
-
-                            phong_material,
-
-                            message
-
-                        )
-
-                    )
-
-            else:
+            if error_count > 0:
 
                 QtWidgets.QMessageBox.warning(
 
@@ -1004,8 +1233,19 @@ class PhongToArnoldWindow(QtWidgets.QWidget):
 
                     "変換結果",
 
-                    "変換結果を取得できませんでした。\n\n"
-                    + str(result)
+                    result_message
+
+                )
+
+            else:
+
+                QtWidgets.QMessageBox.information(
+
+                    self,
+
+                    "変換結果",
+
+                    result_message
 
                 )
 
@@ -1034,7 +1274,7 @@ class PhongToArnoldWindow(QtWidgets.QWidget):
 
 
 # =========================================
-# 07. UI起動
+# 11. UI起動
 # =========================================
 
 def show_ui():
