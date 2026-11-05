@@ -471,6 +471,9 @@ def show_ui():
 
     global WINDOW
 
+    # Mayaのメインウィンドウ取得用モジュール
+    from maya import OpenMayaUI as omui
+    
     maya_ptr = omui.MQtUtil.mainWindow()
 
     if not maya_ptr:
